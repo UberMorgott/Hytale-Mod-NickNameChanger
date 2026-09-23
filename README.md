@@ -11,7 +11,8 @@ A Hytale server plugin that lets players customize their display nickname with c
 - **Nickname rules**: Length, allowed characters (regex), banned words, unique nicknames, no copying of other players' real names
 - **Real names stay real**: commands, `/ban`, `/tp`, shops and vote plugins keep using the player's real username
 - **LuckPerms Integration**: Displays LP prefixes/suffixes in chat
-- **PlaceholderAPI**: `%nnc_nickname%` & co. for other chat plugins (mini-chat-formatter, EssentialsPlus, EliteEssentials, ...), and any `%placeholder%` inside NNC's own chat format
+- **Chat plugins**: nicknames show up automatically in mini-chat-formatter, EssentialsPlus and EliteEssentials chat; HyperPerms via `%nnc_nickname%`
+- **PlaceholderAPI** (optional): `%nnc_nickname%` & co. for any plugin, and any `%placeholder%` inside NNC's own chat format
 
 ## Commands
 
@@ -40,25 +41,25 @@ A Hytale server plugin that lets players customize their display nickname with c
 
 ## Which chat plugin works with LuckPerms + NNC?
 
-Only **one** plugin can format chat. Pick one of these setups:
+Every integration is optional: NNC works alone and with any combination of the plugins below. Only **one** plugin formats chat; NNC picks the route automatically and logs it at startup (`Integrations: ... Chat: ...`).
 
-| Setup | What to do |
-|-------|------------|
-| **NNC + LuckPerms** (simplest) | Nothing. NNC formats chat with LP prefix/suffix (`ChatFormat`). Old LuckPerms 5.5.28 betas had their own chat formatter: set `chat-formatter.enabled: false` in LP's config. LuckPerms 5.5.81+ has no chat formatter. |
-| **mini-chat-formatter + LuckPerms** | Install PlaceholderAPI by HelpChat (CurseForge project 1445106). In MCF's `Format` use `%nnc_nickname_mini%` instead of `<username>`, e.g. `<prefix>%nnc_nickname_mini%<suffix>: <message>` |
-| **EssentialsPlus** | Install PlaceholderAPI. In each chat group format replace `{player}` with `%nnc_nickname_mini%`. For message colors: `%nnc_msgcolor_open%{message}%nnc_msgcolor_close%`. Disable EP's own `/nick` (`disabledCommands`) or use `/nnc`. |
-| **EliteEssentials** | Install PlaceholderAPI, keep `chatFormat.placeholderapi = true`, replace `{player}` with `%nnc_nickname_legacy%` in `defaultFormat` / `groupFormats`. Set `nick.enabled = false` or use `/nnc`. |
-| **HyperPerms chat** | Use `%nnc_nickname%` in HyperPerms' chat format (registered by NNC, no PlaceholderAPI needed). |
-| **KyuubiSoft titles** | With NNC formatting chat: install the Kyuubi Chat Title Bridge (CurseForge project 1581560) + PlaceholderAPI and add e.g. `%ks_title_raw% ` to NNC's `ChatFormat`. Set Kyuubi's `displayMode` to `nametag` or `none` so it doesn't format chat itself. |
-| **MysticNameTags** | Tags in NNC chat: `%mystictags_tag%` in `ChatFormat`. Mystic-owned nameplates: set NNC `ShowOnNameplate` to false and use `%nnc_nickname%` in Mystic's nameplate format. |
+| Installed (besides NNC) | Who formats chat | Nickname in chat | What to do |
+|-------------------------|------------------|------------------|------------|
+| nothing / LuckPerms | NNC (`ChatFormat`, LP prefix/suffix) | ✅ colors + message color | Nothing. Old LuckPerms 5.5.28 betas had their own chat formatter: set `chat-formatter.enabled: false` in LP. |
+| mini-chat-formatter (+ LP, + PAPI) | MCF | ✅ `<username>` shows the nickname (MCF 0.1.x) | Nothing. Other MCF versions: use `%nnc_nickname_mini%` (needs PlaceholderAPI). |
+| EssentialsPlus (+ LP, + MCF, + PAPI) | EP (when EP `chat.enabled`) | ✅ synced into EP's `{player}` + message color | Nothing. EP only accepts nicknames with A-Z, 0-9, `_`; others are refused (the player is told), use `%nnc_nickname_mini%` in EP's format for those (needs PlaceholderAPI). |
+| EliteEssentials (+ LP, + PAPI) | EE (when its `chatFormat` is enabled) | ✅ synced into EE's `{player}` | Nothing. Message color: `%nnc_msgcolor_legacy%` before `{message}` (PlaceholderAPI). |
+| HyperPerms | HyperPerms | ✅ with `%nnc_nickname%` | Replace `%player%` with `%nnc_nickname%` in HyperPerms' chat format (registered by NNC, no PlaceholderAPI needed). |
+| KyuubiSoft titles | NNC | ✅ | Install the Kyuubi Chat Title Bridge (CurseForge 1581560) + PlaceholderAPI, add e.g. `%ks_title_raw% ` to NNC's `ChatFormat`; set Kyuubi `displayMode` to `nametag` or `none`. |
+| MysticNameTags | NNC | ✅ | Tags in chat: `%mystictags_tag%` in `ChatFormat`. Mystic-owned nameplates: NNC `ShowOnNameplate` = false, `%nnc_nameplate%` in Mystic's nameplate format. |
 
-If another plugin formats chat, NNC leaves it alone and logs which plugin it is. Message colors are applied automatically only in NNC's own chat format.
-
+If both EssentialsPlus and EliteEssentials format chat, they conflict with each other (not related to NNC). If an unknown plugin formats chat, NNC leaves it alone and names it in the log at the first message. `/nnc` always works even if another plugin owns `/nick`.
 ### Placeholders (PlaceholderAPI, identifier `nnc`)
 
 | Placeholder | Value |
 |-------------|-------|
-| `%nnc_nickname%` | Nickname as plain text (real name if none) |
+| `%nnc_nickname%` | Nickname as plain text (real name if none or if `ShowInChat` is off) |
+| `%nnc_nameplate%` | Nickname as plain text, ignoring `ShowInChat` (for nameplate plugins) |
 | `%nnc_nickname_mini%` | Nickname with colors as MiniMessage / EssentialsPlus tags |
 | `%nnc_nickname_legacy%` | Nickname with colors as `&#RRGGBB` / `&l` codes |
 | `%nnc_has_nickname%` | `true` / `false` |

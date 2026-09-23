@@ -278,25 +278,25 @@ if (NicknameAPI.isShowInChat() && NicknameAPI.hasNickname(uuid)) {
 
 ## Совместимость: какой чат-плагин работает с LuckPerms + NNC?
 
-Форматировать чат может только **один** плагин. Выберите вариант:
+Все интеграции необязательны: NNC работает один и с любой комбинацией плагинов ниже. Чат форматирует только **один** плагин; NNC выбирает вариант сам и пишет его в лог при запуске (`Integrations: ... Chat: ...`).
 
-| Вариант | Что сделать |
-|---------|-------------|
-| **NNC + LuckPerms** (проще всего) | Ничего. NNC сам форматирует чат с prefix/suffix LuckPerms (`ChatFormat`). В старых бетах LuckPerms 5.5.28 был свой форматтер чата — выключите `chat-formatter.enabled: false`. В LuckPerms 5.5.81+ его нет. |
-| **mini-chat-formatter + LuckPerms** | Установите PlaceholderAPI от HelpChat (CurseForge 1445106). В `Format` MCF вместо `<username>` используйте `%nnc_nickname_mini%`, например `<prefix>%nnc_nickname_mini%<suffix>: <message>` |
-| **EssentialsPlus** | Установите PlaceholderAPI. В форматах групп замените `{player}` на `%nnc_nickname_mini%`. Цвет сообщений: `%nnc_msgcolor_open%{message}%nnc_msgcolor_close%`. Отключите `/nick` EP (`disabledCommands`) или используйте `/nnc`. |
-| **EliteEssentials** | Установите PlaceholderAPI, `chatFormat.placeholderapi = true`, замените `{player}` на `%nnc_nickname_legacy%` в `defaultFormat` / `groupFormats`. `nick.enabled = false` или используйте `/nnc`. |
-| **HyperPerms** | Используйте `%nnc_nickname%` в формате чата HyperPerms (регистрируется NNC, PlaceholderAPI не нужен). |
-| **Титулы KyuubiSoft** | Чат форматирует NNC: установите Kyuubi Chat Title Bridge (CurseForge 1581560) + PlaceholderAPI и добавьте в `ChatFormat`, например, `%ks_title_raw% `. В Kyuubi поставьте `displayMode` = `nametag` или `none`. |
-| **MysticNameTags** | Теги в чате NNC: `%mystictags_tag%` в `ChatFormat`. Если табличками управляет Mystic: `ShowOnNameplate` = false в NNC и `%nnc_nickname%` в формате табличек Mystic. |
+| Установлено (кроме NNC) | Кто форматирует чат | Никнейм в чате | Что сделать |
+|-------------------------|---------------------|----------------|-------------|
+| ничего / LuckPerms | NNC (`ChatFormat`, prefix/suffix LP) | ✅ цвета + цвет сообщений | Ничего. В старых бетах LuckPerms 5.5.28 был свой форматтер чата — `chat-formatter.enabled: false`. |
+| mini-chat-formatter (+ LP, + PAPI) | MCF | ✅ `<username>` показывает никнейм (MCF 0.1.x) | Ничего. Другие версии MCF: `%nnc_nickname_mini%` (нужен PlaceholderAPI). |
+| EssentialsPlus (+ LP, + MCF, + PAPI) | EP (если `chat.enabled`) | ✅ синхронизируется в `{player}` EP + цвет сообщений | Ничего. EP принимает только A-Z, 0-9, `_`; другие никнеймы EP отклоняет (игрок получает сообщение) — для них `%nnc_nickname_mini%` в формате EP (нужен PlaceholderAPI). |
+| EliteEssentials (+ LP, + PAPI) | EE (если включён `chatFormat`) | ✅ синхронизируется в `{player}` EE | Ничего. Цвет сообщений: `%nnc_msgcolor_legacy%` перед `{message}` (PlaceholderAPI). |
+| HyperPerms | HyperPerms | ✅ через `%nnc_nickname%` | Замените `%player%` на `%nnc_nickname%` в формате чата HyperPerms (регистрирует NNC, PlaceholderAPI не нужен). |
+| Титулы KyuubiSoft | NNC | ✅ | Kyuubi Chat Title Bridge (CurseForge 1581560) + PlaceholderAPI, в `ChatFormat` добавьте, например, `%ks_title_raw% `; в Kyuubi `displayMode` = `nametag` или `none`. |
+| MysticNameTags | NNC | ✅ | Теги в чате: `%mystictags_tag%` в `ChatFormat`. Таблички Mystic: `ShowOnNameplate` = false в NNC и `%nnc_nameplate%` в формате табличек Mystic. |
 
-Если чат форматирует другой плагин, NNC его не трогает и пишет в лог, какой это плагин. Цвет сообщений применяется автоматически только в формате чата NNC.
-
+Если чат форматируют и EssentialsPlus, и EliteEssentials, они конфликтуют между собой (NNC тут ни при чём). Если чат форматирует неизвестный плагин, NNC его не трогает и называет его в логе при первом сообщении. `/nnc` работает всегда, даже если `/nick` занят другим плагином.
 ### Плейсхолдеры (PlaceholderAPI, идентификатор `nnc`)
 
 | Плейсхолдер | Значение |
 |-------------|----------|
-| `%nnc_nickname%` | Никнейм без цветов (или настоящее имя) |
+| `%nnc_nickname%` | Никнейм без цветов (настоящее имя, если никнейма нет или `ShowInChat` выключен) |
+| `%nnc_nameplate%` | Никнейм без цветов независимо от `ShowInChat` (для плагинов табличек) |
 | `%nnc_nickname_mini%` | Никнейм с цветами в тегах MiniMessage / EssentialsPlus |
 | `%nnc_nickname_legacy%` | Никнейм с цветами в кодах `&#RRGGBB` / `&l` |
 | `%nnc_has_nickname%` | `true` / `false` |

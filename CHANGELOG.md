@@ -7,12 +7,13 @@
 ### Fixed
 - **`/nick` did nothing on 0.6.8** ("players only" for everyone): the command now runs for player senders. Main command is `/nnc`; `/nick` and `/nickname` are aliases, so it still works when EliteEssentials / EssentialsPlus own `/nick`.
 - **Commands of other plugins used the nickname instead of the real name** (shops, votes, `/ban`, `/tp`, whitelist). The real username is never modified anymore — no more reflection on `PlayerRef.username`.
-- **Nicknames missing in chat with LuckPerms / other chat plugins** since 0.0.15. NNC formats chat only when no other plugin does; other plugins show nicknames through placeholders (see below).
+- **Nicknames missing in chat with LuckPerms / other chat plugins** since 0.0.15. NNC formats chat only when no other plugin does; mini-chat-formatter, EssentialsPlus and EliteEssentials show the nickname automatically (see below).
 - **Tab list**: nicknames are kept on join, world change, unhide, spectate and lives updates; vanished players no longer reappear after a nickname change; real ping instead of 0.
 - **Map**: nicknames no longer disappear after the first chat message.
 - **Disabling "Show on Nameplate" blanked all nameplates**; it now restores the real name.
 - **Settings lost after updating to 0.0.17**: old camelCase `config.json` keys are migrated (backup `config.json.pre-0.0.18.bak`).
-- **Nicknames lost after a bad edit of `nicknames.json`**: a file that can't be read is never overwritten; UTF-8 BOM is handled.
+- **Nicknames lost after a bad edit of `nicknames.json`**: a file that can't be read (also empty / `null` / wrong types) is never overwritten; UTF-8 BOM is handled. Failed saves are reported instead of confirmed.
+- If `config.json` can't be migrated, loading stops with an error instead of silently using defaults; partly converted configs keep all their values.
 - **LuckPerms hex / gradient prefixes** rendered wrong (styles leaked, closing tags ignored). New scoped markup parser: `<#hex>`, named colors, `<gradient:a:b[:c]>`, b/i/u, `<reset>`, legacy `&` codes.
 - Chat message gradients no longer delete `<` and `>` from what players type.
 - Editor ignored Apply/Reset clicks right after typing.
@@ -20,9 +21,14 @@
 - Server showed NNC as "outdated" (`ServerVersion` is now `>=0.6.8`).
 
 ### Added
-- **Nickname rules**: `Nicknames.AllowedCharactersRegex`, `Nicknames.BlockRealUsernames` (nickname can't be another known player's real name, also offline players); uniqueness is checked atomically; symbols like `& % { } < >` are always rejected. Invalid nicknames are rejected with a reason instead of silently changed.
+- **Nickname rules** (invalid rules disable nickname changes instead of loosening them; `nickname.format` is checked for the editor's text field too): `Nicknames.AllowedCharactersRegex`, `Nicknames.BlockRealUsernames` (nickname can't be another known player's real name, also offline players); uniqueness is checked atomically; symbols like `& % { } < >` are always rejected. Invalid nicknames are rejected with a reason instead of silently changed.
+- **Chat plugin adapters** (all optional, no PlaceholderAPI needed):
+  - **mini-chat-formatter** 0.1.x: `<username>` shows the nickname; LP/PAPI tags keep working.
+  - **EssentialsPlus**: nickname synced into EP's `{player}` (EP accepts only A-Z, 0-9, _; refusals are reported), message color restored; a player's own EP nickname is kept and restored.
+  - **EliteEssentials**: nickname synced into EE's `{player}`.
+  - Startup log line with detected integrations and which plugin formats chat.
 - **`nickname.msgcolor` permission** for `/nick msgcolor` and the editor's message tab, separate from `nickname.format`.
-- **PlaceholderAPI (HelpChat)**: `%nnc_nickname%`, `%nnc_nickname_mini%`, `%nnc_nickname_legacy%`, `%nnc_has_nickname%`, `%nnc_realname%`, `%nnc_msgcolor_open%`, `%nnc_msgcolor_close%`, `%nnc_msgcolor_legacy%` for mini-chat-formatter, EssentialsPlus, EliteEssentials, MysticNameTags, ...
+- **PlaceholderAPI (HelpChat, optional)**: `%nnc_nickname%`, `%nnc_nickname_mini%`, `%nnc_nickname_legacy%` (follow `ShowInChat`), `%nnc_nameplate%`, `%nnc_has_nickname%`, `%nnc_realname%`, `%nnc_msgcolor_open%`, `%nnc_msgcolor_close%`, `%nnc_msgcolor_legacy%`.
 - External `%placeholders%` in NNC's `ChatFormat` (e.g. KyuubiSoft titles via the title bridge, MysticNameTags tags).
 - HyperPerms: `%nnc_nickname%` in HyperPerms' chat format.
 - README: which chat plugin setup to use with LuckPerms.
@@ -30,7 +36,7 @@
 ### Changed
 - NNC no longer writes the LuckPerms `display-name` meta node (nothing read it). Existing nodes are left as they are.
 - `originals.json` now stores the real name of every player who joined (needed for `BlockRealUsernames`).
-- Removed the unused TinyMessage optional dependency; fixed the mini-chat-formatter id (`lucko:mini-chat-formatter`).
+- Optional dependencies: LuckPerms, HelpChat PlaceholderAPI, HyperPerms, EssentialsPlus, EliteEssentials, `lucko:mini-chat-formatter` (was the wrong `lucko:MiniChatFormatter`); removed the unused TinyMessage.
 ## [0.0.10] - 2026-02-15
 
 > **Requires Hytale Pre-Release** (February 2026+)
