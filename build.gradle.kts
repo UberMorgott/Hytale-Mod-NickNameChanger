@@ -49,6 +49,8 @@ tasks {
 
     test {
         useJUnitPlatform()
+        // HytaleLogger requires its log manager to be installed before java.util.logging starts
+        systemProperty("java.util.logging.manager", "com.hypixel.hytale.logger.backend.HytaleLogManager")
     }
 }
 

@@ -60,13 +60,12 @@ public final class NicknameService {
             case OK -> null;
             case TAKEN_BY_NICKNAME -> Messages.ERROR_NICKNAME_TAKEN;
             case TAKEN_BY_USERNAME -> Messages.ERROR_REAL_USERNAME;
-            case NOT_SAVED -> Messages.ERROR_NOT_SAVED;
+            case STORAGE_ERROR -> Messages.ERROR_NOT_SAVED;
         };
         if (claimError != null) {
             error(playerRef, Messages.get(playerRef, claimError));
             return false;
         }
-
 
         display.refresh(ref, store, playerRef);
 
@@ -85,16 +84,19 @@ public final class NicknameService {
             return;
         }
 
-        storage.removeNickname(uuid);
-        storage.removeMessageColor(uuid);
-
-
+        if (!storage.removeNickname(uuid)) {
+            error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
+            return;
+        }
         display.refresh(ref, store, playerRef);
 
         playerRef.sendMessage(Message.join(
             Message.raw(Messages.get(playerRef, Messages.RESET_SUCCESS) + " ").color("#55FF55"),
             Message.raw(playerRef.getUsername()).color("#FFFFFF")
         ));
+        if (!storage.removeMessageColor(uuid)) {
+            error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
+        }
     }
 
     /**
@@ -104,7 +106,10 @@ public final class NicknameService {
     public void setMessageColor(@Nonnull PlayerRef playerRef, @Nonnull String value) {
         UUID uuid = playerRef.getUuid();
         if (value.isEmpty() || value.equalsIgnoreCase("reset") || value.equalsIgnoreCase("off") || value.equalsIgnoreCase("clear")) {
-            storage.removeMessageColor(uuid);
+            if (!storage.removeMessageColor(uuid)) {
+                error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
+                return;
+            }
             playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_RESET)).color("#55FF55"));
             return;
         }
@@ -117,7 +122,10 @@ public final class NicknameService {
             playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_USAGE)).color("#FFFF55"));
             return;
         }
-        storage.setMessageColor(uuid, color);
+        if (!storage.setMessageColor(uuid, color)) {
+            error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
+            return;
+        }
         playerRef.sendMessage(Message.join(
             Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_SET) + " ").color("#55FF55"),
             messagePreview(color)

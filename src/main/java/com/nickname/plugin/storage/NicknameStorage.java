@@ -12,17 +12,24 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.logging.Level;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import javax.annotation.Nullable;
 
 /**
  * Handles persistent storage of player nicknames.
+ * <p>
+ * Every mutation is saved immediately; if the save fails the in-memory change is rolled back
+ * and the method reports {@code false}, so callers never confirm a change that would be lost.
  */
 public class NicknameStorage {
 
@@ -50,7 +57,7 @@ public class NicknameStorage {
     }
 
     /** Why {@link #claimNickname} refused a nickname. */
-    public enum ClaimResult { OK, TAKEN_BY_NICKNAME, TAKEN_BY_USERNAME, NOT_SAVED }
+    public enum ClaimResult { OK, TAKEN_BY_NICKNAME, TAKEN_BY_USERNAME, STORAGE_ERROR }
 
     /**
      * Checks uniqueness and stores the nickname in one step, so two players can't take the same
@@ -63,6 +70,10 @@ public class NicknameStorage {
                                                   boolean checkNicknames, boolean checkUsernames) {
         String key = NicknameValidator.canonical(plain);
         if (checkUsernames) {
+            if (unwritableFiles.contains(originalsFile)) {
+                // Known names could not be loaded: real-name protection can't be guaranteed
+                return ClaimResult.STORAGE_ERROR;
+            }
             for (Map.Entry<UUID, String> entry : originalUsernames.entrySet()) {
                 if (!entry.getKey().equals(uuid) && NicknameValidator.canonical(entry.getValue()).equals(key)) {
                     return ClaimResult.TAKEN_BY_USERNAME;
@@ -77,18 +88,12 @@ public class NicknameStorage {
                 }
             }
         }
-        String previous = nicknames.put(uuid, nickname);
-        if (!saveNicknames()) {
-            if (previous != null) nicknames.put(uuid, previous); else nicknames.remove(uuid);
-            return ClaimResult.NOT_SAVED;
-        }
-        return ClaimResult.OK;
+        return update(nicknames, storageFile, uuid, nickname) ? ClaimResult.OK : ClaimResult.STORAGE_ERROR;
     }
 
-    public synchronized void removeNickname(UUID uuid) {
-        if (nicknames.remove(uuid) != null) {
-            saveNicknames();
-        }
+    /** @return false if the change could not be saved (nothing changed then) */
+    public synchronized boolean removeNickname(UUID uuid) {
+        return update(nicknames, storageFile, uuid, null);
     }
 
     /**
@@ -96,8 +101,8 @@ public class NicknameStorage {
      * a nickname reset, so nicknames can't impersonate players that are offline.
      */
     public synchronized void rememberUsername(UUID uuid, String username) {
-        if (!username.equals(originalUsernames.put(uuid, username))) {
-            saveOriginals();
+        if (!unwritableFiles.contains(originalsFile)) {
+            update(originalUsernames, originalsFile, uuid, username);
         }
     }
 
@@ -120,6 +125,7 @@ public class NicknameStorage {
     public synchronized boolean hasNickname(UUID uuid) {
         return nicknames.containsKey(uuid);
     }
+
     public synchronized String getDisplayName(UUID uuid, String defaultName) {
         String nickname = nicknames.get(uuid);
         return nickname != null ? nickname : defaultName;
@@ -131,19 +137,13 @@ public class NicknameStorage {
         return messageColors.get(uuid);
     }
 
-    public synchronized void setMessageColor(UUID uuid, String color) {
-        if (color == null || color.isEmpty()) {
-            messageColors.remove(uuid);
-        } else {
-            messageColors.put(uuid, color);
-        }
-        saveMessageColors();
+    /** @param color the color, or null/empty to remove it; returns false if it could not be saved */
+    public synchronized boolean setMessageColor(UUID uuid, @Nullable String color) {
+        return update(messageColors, messageColorsFile, uuid, color == null || color.isEmpty() ? null : color);
     }
 
-    public synchronized void removeMessageColor(UUID uuid) {
-        if (messageColors.remove(uuid) != null) {
-            saveMessageColors();
-        }
+    public synchronized boolean removeMessageColor(UUID uuid) {
+        return setMessageColor(uuid, null);
     }
 
     // --- Global display settings (read from config) ---
@@ -160,6 +160,16 @@ public class NicknameStorage {
         return config.display.showInTabList;
     }
 
+    /** Sets ({@code value != null}) or removes one entry and saves; rolls back and returns false if saving fails. */
+    private boolean update(Map<UUID, String> map, Path file, UUID uuid, @Nullable String value) {
+        String previous = value == null ? map.remove(uuid) : map.put(uuid, value);
+        if (Objects.equals(previous, value) || saveMap(file, map)) {
+            return true;
+        }
+        if (previous == null) map.remove(uuid); else map.put(uuid, previous);
+        return false;
+    }
+
     private void load() {
         loadMap(storageFile, nicknames);
         loadMap(messageColorsFile, messageColors);
@@ -167,9 +177,9 @@ public class NicknameStorage {
     }
 
     /**
-     * Loads a UUID-to-string map. A file that cannot be read completely (bad JSON, bad encoding,
-     * invalid UUID keys) is never overwritten: it is marked unwritable so the data stays on disk
-     * for manual repair instead of being replaced by a partial map on the next save.
+     * Loads a UUID-to-string map. An existing file that is not exactly that (bad JSON or encoding,
+     * empty, {@code null}, non-object root, invalid UUID key, non-string value) is never overwritten:
+     * it is marked unwritable so the data stays on disk for manual repair. A missing file is empty.
      */
     private void loadMap(Path file, Map<UUID, String> target) {
         if (!Files.exists(file)) return;
@@ -178,16 +188,17 @@ public class NicknameStorage {
             if (json.startsWith("﻿")) {
                 json = json.substring(1); // UTF-8 BOM written by some editors (e.g. Notepad)
             }
-            Type type = new TypeToken<Map<String, String>>(){}.getType();
-            Map<String, String> loaded = GSON.fromJson(json, type);
+            JsonElement root = JsonParser.parseString(json);
+            if (!root.isJsonObject()) {
+                throw new IllegalArgumentException("expected a JSON object, found: " + root);
+            }
             Map<UUID, String> parsed = new HashMap<>();
-            if (loaded != null) {
-                for (Map.Entry<String, String> entry : loaded.entrySet()) {
-                    if (entry.getValue() == null) {
-                        throw new IllegalArgumentException("null value for key " + entry.getKey());
-                    }
-                    parsed.put(UUID.fromString(entry.getKey()), entry.getValue());
+            for (Map.Entry<String, JsonElement> entry : ((JsonObject) root).entrySet()) {
+                JsonElement value = entry.getValue();
+                if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+                    throw new IllegalArgumentException("value of " + entry.getKey() + " is not a string");
                 }
+                parsed.put(UUID.fromString(entry.getKey()), value.getAsString());
             }
             target.putAll(parsed);
         } catch (Exception e) {
@@ -198,7 +209,7 @@ public class NicknameStorage {
         }
     }
 
-    private synchronized boolean saveMap(Path file, Map<UUID, String> source) {
+    private boolean saveMap(Path file, Map<UUID, String> source) {
         if (unwritableFiles.contains(file)) {
             LOGGER.at(Level.SEVERE).log("Not saving %s: it failed to load at startup (see earlier error).", file.getFileName());
             return false;
@@ -223,17 +234,5 @@ public class NicknameStorage {
             return false;
         }
         return true;
-    }
-
-    private boolean saveNicknames() {
-        return saveMap(storageFile, nicknames);
-    }
-
-    private void saveOriginals() {
-        saveMap(originalsFile, originalUsernames);
-    }
-
-    private void saveMessageColors() {
-        saveMap(messageColorsFile, messageColors);
     }
 }
