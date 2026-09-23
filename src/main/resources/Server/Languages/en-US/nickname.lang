@@ -31,7 +31,6 @@ reset.noNickname = You don't have a nickname.
 
 # Set messages
 set.success = Nickname set to:
-set.updated = Updated: Chat, Tab list, Map, Nameplate
 
 # Message color
 msgcolor.set = Message color set:

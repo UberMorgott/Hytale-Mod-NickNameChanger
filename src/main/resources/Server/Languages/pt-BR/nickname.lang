@@ -31,7 +31,6 @@ reset.noNickname = Você não tem um apelido.
 
 # Mensagens de definição
 set.success = Apelido definido:
-set.updated = Atualizado: Chat, Lista de jogadores, Mapa, Placa de nome
 
 # Cor da mensagem
 msgcolor.set = Cor da mensagem definida:
