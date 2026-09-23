@@ -12,6 +12,9 @@ error.invalid = Apelido inválido.
 error.noFormatPermission = Você não tem permissão para usar cores e estilos.
 error.bannedWord = Este apelido contém uma palavra proibida.
 error.nicknameTaken = Este apelido já está em uso.
+error.invalidCharacters = O apelido contém caracteres não permitidos.
+error.realUsername = Este é o nome de outro jogador.
+error.notSaved = Não foi possível salvar o apelido, avise um administrador (veja o log do servidor).
 
 # Informações do apelido atual
 current.nickname = Seu apelido atual:

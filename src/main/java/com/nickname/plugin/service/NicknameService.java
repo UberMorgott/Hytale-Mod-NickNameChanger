@@ -2,6 +2,7 @@ package com.nickname.plugin.service;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -11,10 +12,11 @@ import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.i18n.Messages;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
+import com.nickname.plugin.validation.NicknameValidator;
 
 import javax.annotation.Nonnull;
-import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * Set / reset logic shared by the /nick command and the editor UI, so both apply the same
@@ -23,68 +25,51 @@ import java.util.UUID;
  */
 public final class NicknameService {
 
-    private static final Set<String> ALLOWED_TAGS = Set.of(
-        "color", "gradient", "b", "bold", "i", "italic", "u", "underline"
-    );
+    private static final HytaleLogger LOGGER = HytaleLogger.get("NicknameChanger");
 
     private final NicknameStorage storage;
     private final PluginConfig config;
     private final NicknameDisplay display;
+    private final NicknameValidator validator;
 
     public NicknameService(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config, @Nonnull NicknameDisplay display) {
         this.storage = storage;
         this.config = config;
         this.display = display;
+        this.validator = new NicknameValidator(config.nicknames, message -> LOGGER.at(Level.SEVERE).log(message));
     }
 
     /** Validates and applies a nickname (may contain formatting tags). Returns {@code true} on success. */
     public boolean setNickname(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
-                               @Nonnull PlayerRef playerRef, @Nonnull String nickname) {
+                               @Nonnull PlayerRef playerRef, @Nonnull String input) {
         UUID uuid = playerRef.getUuid();
-
-        // Check length without color tags
-        String plainNickname = MessageUtil.stripTags(nickname);
-        int minLen = config.nicknames.minLength;
-        int maxLen = config.nicknames.maxLength;
-        if (plainNickname.length() < minLen) {
-            error(playerRef, Messages.get(playerRef, Messages.ERROR_MIN_LENGTH, "min", minLen));
-            return false;
-        }
-        if (plainNickname.length() > maxLen) {
-            error(playerRef, Messages.get(playerRef, Messages.ERROR_MAX_LENGTH, "max", maxLen));
+        NicknameValidator.Result result = validator.validate(input);
+        if (!result.isValid()) {
+            error(playerRef, Messages.get(playerRef, result.errorKey(), result.args()));
             return false;
         }
 
-        String filtered = filterNickname(nickname);
-        if (filtered.isEmpty()) {
-            error(playerRef, Messages.get(playerRef, Messages.ERROR_INVALID));
+        NicknameStorage.ClaimResult claim = storage.claimNickname(uuid, result.nickname(), result.plain(),
+            config.nicknames.uniqueNicknames, config.nicknames.blockRealUsernames);
+        String claimError = switch (claim) {
+            case OK -> null;
+            case TAKEN_BY_NICKNAME -> Messages.ERROR_NICKNAME_TAKEN;
+            case TAKEN_BY_USERNAME -> Messages.ERROR_REAL_USERNAME;
+            case NOT_SAVED -> Messages.ERROR_NOT_SAVED;
+        };
+        if (claimError != null) {
+            error(playerRef, Messages.get(playerRef, claimError));
             return false;
         }
-
-        String plainFiltered = MessageUtil.stripTags(filtered).toLowerCase();
-        for (String banned : config.nicknames.bannedWords) {
-            if (plainFiltered.contains(banned.toLowerCase())) {
-                error(playerRef, Messages.get(playerRef, Messages.ERROR_BANNED_WORD));
-                return false;
-            }
-        }
-
-        if (config.nicknames.uniqueNicknames && storage.isNicknameTaken(plainFiltered, uuid)) {
-            error(playerRef, Messages.get(playerRef, Messages.ERROR_NICKNAME_TAKEN));
-            return false;
-        }
-
-        storage.setNickname(uuid, filtered);
-        storage.setOriginalUsername(uuid, playerRef.getUsername());
 
         if (LuckPermsHook.isAvailable()) {
-            LuckPermsHook.setDisplayName(uuid, filtered);
+            LuckPermsHook.setDisplayName(uuid, result.nickname());
         }
         display.refresh(ref, store, playerRef);
 
         playerRef.sendMessage(Message.join(
             Message.raw(Messages.get(playerRef, Messages.SET_SUCCESS) + " ").color("#55FF55"),
-            MessageUtil.parse(filtered)
+            MessageUtil.parse(result.nickname())
         ));
         return true;
     }
@@ -113,42 +98,5 @@ public final class NicknameService {
 
     private static void error(@Nonnull PlayerRef playerRef, @Nonnull String text) {
         playerRef.sendMessage(Message.raw(text).color("#FF5555"));
-    }
-
-    private boolean isAllowedChar(char c) {
-        // Basic punctuation always allowed
-        if (c == ' ' || c == '_' || c == '-' || c == '.' || c == '!' || c == '?') return true;
-        // ASCII letters and digits always allowed
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) return true;
-        // Cyrillic
-        if (config.nicknames.allowCyrillic && Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC) return true;
-        // All other Unicode
-        if (config.nicknames.allowUnicode && Character.isLetterOrDigit(c)) return true;
-        return false;
-    }
-
-    @Nonnull
-    private String filterNickname(@Nonnull String nickname) {
-        // Keep only whitelisted formatting tags and allowed characters
-        StringBuilder filtered = new StringBuilder();
-        int i = 0;
-        while (i < nickname.length()) {
-            char c = nickname.charAt(i);
-            int end = c == '<' ? nickname.indexOf('>', i) : -1;
-            if (end == -1) {
-                if (isAllowedChar(c)) filtered.append(c);
-                i++;
-                continue;
-            }
-            String tagName = nickname.substring(i + 1, end);
-            if (tagName.startsWith("/")) tagName = tagName.substring(1);
-            int colonIdx = tagName.indexOf(':');
-            if (colonIdx >= 0) tagName = tagName.substring(0, colonIdx);
-            if (ALLOWED_TAGS.contains(tagName.toLowerCase().trim())) {
-                filtered.append(nickname, i, end + 1);
-            }
-            i = end + 1;
-        }
-        return filtered.toString().trim();
     }
 }

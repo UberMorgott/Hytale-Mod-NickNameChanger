@@ -17,6 +17,7 @@ dependencies {
     compileOnly("net.luckperms:api:5.4")
     implementation("com.google.code.gson:gson:2.10.1")
 
+    testImplementation("com.hypixel.hytale:Server:0.6.8")
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

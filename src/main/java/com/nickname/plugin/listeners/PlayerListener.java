@@ -3,6 +3,8 @@ package com.nickname.plugin.listeners;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -13,8 +15,12 @@ import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
 
 import javax.annotation.Nonnull;
+import java.util.UUID;
+import java.util.logging.Level;
 
 public class PlayerListener {
+
+    private static final HytaleLogger LOGGER = HytaleLogger.get("NicknameChanger");
 
     private final NicknameStorage storage;
     private final PluginConfig config;
@@ -24,6 +30,20 @@ public class PlayerListener {
         this.storage = storage;
         this.config = config;
         this.display = display;
+    }
+
+    /**
+     * Records every player's real username, so nicknames can't copy the name of a known player
+     * (online or offline). Warns if a nickname stored earlier equals this newly seen username.
+     */
+    public void onPlayerConnect(@Nonnull PlayerConnectEvent event) {
+        PlayerRef playerRef = event.getPlayerRef();
+        storage.rememberUsername(playerRef.getUuid(), playerRef.getUsername());
+        for (UUID owner : storage.findNicknameOwners(playerRef.getUsername(), playerRef.getUuid())) {
+            LOGGER.at(Level.WARNING).log("Player %s (%s) has the nickname '%s', which is the username of %s (%s). "
+                + "Consider resetting that nickname.", storage.getOriginalUsername(owner), owner,
+                storage.getNickname(owner), playerRef.getUsername(), playerRef.getUuid());
+        }
     }
 
     /**

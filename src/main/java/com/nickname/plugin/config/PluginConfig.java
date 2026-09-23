@@ -52,6 +52,8 @@ public class PluginConfig {
                 .append(new KeyedCodec<>("AllowUnicode", Codec.BOOLEAN), (o, v) -> o.allowUnicode = v, o -> o.allowUnicode).add()
                 .append(new KeyedCodec<>("UniqueNicknames", Codec.BOOLEAN), (o, v) -> o.uniqueNicknames = v, o -> o.uniqueNicknames).add()
                 .append(new KeyedCodec<>("BannedWords", Codec.STRING_ARRAY), (o, v) -> o.bannedWords = v, o -> o.bannedWords).add()
+                .append(new KeyedCodec<>("AllowedCharactersRegex", Codec.STRING), (o, v) -> o.allowedCharactersRegex = v, o -> o.allowedCharactersRegex).add()
+                .append(new KeyedCodec<>("BlockRealUsernames", Codec.BOOLEAN), (o, v) -> o.blockRealUsernames = v, o -> o.blockRealUsernames).add()
                 .build();
 
         public int minLength = 2;
@@ -60,6 +62,10 @@ public class PluginConfig {
         public boolean allowUnicode = false;
         public boolean uniqueNicknames = true;
         public String[] bannedWords = {"admin", "moderator", "server", "owner"};
+        /** Regex the whole visible nickname must match, e.g. {@code ^[A-Za-z0-9_]+$}. Empty: use AllowCyrillic/AllowUnicode. */
+        public String allowedCharactersRegex = "";
+        /** Reject nicknames equal to the real username of another known player. */
+        public boolean blockRealUsernames = true;
     }
 
     public static class Integrations {

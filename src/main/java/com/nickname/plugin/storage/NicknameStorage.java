@@ -2,12 +2,15 @@ package com.nickname.plugin.storage;
 
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.util.MessageUtil;
+import com.nickname.plugin.validation.NicknameValidator;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -46,31 +49,68 @@ public class NicknameStorage {
         return nicknames.get(uuid);
     }
 
-    public synchronized void setNickname(UUID uuid, String nickname) {
-        if (nickname == null || nickname.isEmpty()) {
-            nicknames.remove(uuid);
-        } else {
-            nicknames.put(uuid, nickname);
+    /** Why {@link #claimNickname} refused a nickname. */
+    public enum ClaimResult { OK, TAKEN_BY_NICKNAME, TAKEN_BY_USERNAME, NOT_SAVED }
+
+    /**
+     * Checks uniqueness and stores the nickname in one step, so two players can't take the same
+     * name at once. Names are compared by {@link NicknameValidator#canonical} of the visible text.
+     *
+     * @param checkNicknames reject if another player's nickname has the same visible text
+     * @param checkUsernames reject if it equals another known player's real username
+     */
+    public synchronized ClaimResult claimNickname(UUID uuid, String nickname, String plain,
+                                                  boolean checkNicknames, boolean checkUsernames) {
+        String key = NicknameValidator.canonical(plain);
+        if (checkUsernames) {
+            for (Map.Entry<UUID, String> entry : originalUsernames.entrySet()) {
+                if (!entry.getKey().equals(uuid) && NicknameValidator.canonical(entry.getValue()).equals(key)) {
+                    return ClaimResult.TAKEN_BY_USERNAME;
+                }
+            }
         }
-        saveNicknames();
+        if (checkNicknames) {
+            for (Map.Entry<UUID, String> entry : nicknames.entrySet()) {
+                if (!entry.getKey().equals(uuid)
+                        && NicknameValidator.canonical(MessageUtil.stripTags(entry.getValue())).equals(key)) {
+                    return ClaimResult.TAKEN_BY_NICKNAME;
+                }
+            }
+        }
+        String previous = nicknames.put(uuid, nickname);
+        if (!saveNicknames()) {
+            if (previous != null) nicknames.put(uuid, previous); else nicknames.remove(uuid);
+            return ClaimResult.NOT_SAVED;
+        }
+        return ClaimResult.OK;
     }
 
     public synchronized void removeNickname(UUID uuid) {
-        nicknames.remove(uuid);
-        saveNicknames();
-        // Keep originalUsernames — needed if player sets nick again
+        if (nicknames.remove(uuid) != null) {
+            saveNicknames();
+        }
     }
 
-    public synchronized void removeOriginalUsername(UUID uuid) {
-        originalUsernames.remove(uuid);
-        saveOriginals();
-    }
-
-    public synchronized void setOriginalUsername(UUID uuid, String username) {
-        if (!originalUsernames.containsKey(uuid)) {
-            originalUsernames.put(uuid, username);
+    /**
+     * Records the player's real username (called on every connect). Known usernames are kept after
+     * a nickname reset, so nicknames can't impersonate players that are offline.
+     */
+    public synchronized void rememberUsername(UUID uuid, String username) {
+        if (!username.equals(originalUsernames.put(uuid, username))) {
             saveOriginals();
         }
+    }
+
+    /** Players (other than {@code uuid}) whose nickname has the same visible text as this username. */
+    public synchronized List<UUID> findNicknameOwners(String username, UUID uuid) {
+        String key = NicknameValidator.canonical(username);
+        List<UUID> owners = new ArrayList<>();
+        for (Map.Entry<UUID, String> entry : nicknames.entrySet()) {
+            if (!entry.getKey().equals(uuid) && NicknameValidator.canonical(MessageUtil.stripTags(entry.getValue())).equals(key)) {
+                owners.add(entry.getKey());
+            }
+        }
+        return owners;
     }
 
     public synchronized String getOriginalUsername(UUID uuid) {
@@ -80,17 +120,6 @@ public class NicknameStorage {
     public synchronized boolean hasNickname(UUID uuid) {
         return nicknames.containsKey(uuid);
     }
-
-    public synchronized boolean isNicknameTaken(String plainNickname, UUID excludePlayer) {
-        String lower = plainNickname.toLowerCase();
-        for (Map.Entry<UUID, String> entry : nicknames.entrySet()) {
-            if (entry.getKey().equals(excludePlayer)) continue;
-            String existing = MessageUtil.stripTags(entry.getValue()).toLowerCase();
-            if (existing.equals(lower)) return true;
-        }
-        return false;
-    }
-
     public synchronized String getDisplayName(UUID uuid, String defaultName) {
         String nickname = nicknames.get(uuid);
         return nickname != null ? nickname : defaultName;
@@ -169,10 +198,10 @@ public class NicknameStorage {
         }
     }
 
-    private synchronized void saveMap(Path file, Map<UUID, String> source) {
+    private synchronized boolean saveMap(Path file, Map<UUID, String> source) {
         if (unwritableFiles.contains(file)) {
             LOGGER.at(Level.SEVERE).log("Not saving %s: it failed to load at startup (see earlier error).", file.getFileName());
-            return;
+            return false;
         }
         try {
             Files.createDirectories(file.getParent());
@@ -191,11 +220,13 @@ public class NicknameStorage {
             }
         } catch (IOException e) {
             LOGGER.at(Level.SEVERE).withCause(e).log("Failed to save %s", file.getFileName());
+            return false;
         }
+        return true;
     }
 
-    private void saveNicknames() {
-        saveMap(storageFile, nicknames);
+    private boolean saveNicknames() {
+        return saveMap(storageFile, nicknames);
     }
 
     private void saveOriginals() {

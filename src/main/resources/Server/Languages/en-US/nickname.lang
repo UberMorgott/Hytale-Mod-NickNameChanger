@@ -12,6 +12,9 @@ error.invalid = Invalid nickname.
 error.noFormatPermission = You don't have permission to use colors and styles.
 error.bannedWord = This nickname contains a forbidden word.
 error.nicknameTaken = This nickname is already taken.
+error.invalidCharacters = The nickname contains characters that are not allowed.
+error.realUsername = This is the name of another player.
+error.notSaved = The nickname could not be saved, please tell an admin (see the server log).
 
 # Current nickname info
 current.nickname = Your current nickname:

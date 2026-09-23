@@ -5,6 +5,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.util.Config;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.universe.world.events.AddWorldEvent;
 
@@ -77,6 +78,7 @@ public class NicknameChanger extends JavaPlugin {
         getCommandRegistry().registerCommand(new NickCommand(storage, config, display, new NicknameService(storage, config, display)));
         // LAST: only format chat that no other plugin has taken over
         getEventRegistry().registerGlobal(EventPriority.LAST, PlayerChatEvent.class, chatListener::onPlayerChat);
+        getEventRegistry().register(PlayerConnectEvent.class, playerListener::onPlayerConnect);
         getEventRegistry().registerGlobal(PlayerReadyEvent.class, playerListener::onPlayerReady);
         getEventRegistry().registerGlobal(AddWorldEvent.class, display::onAddWorld);
     }

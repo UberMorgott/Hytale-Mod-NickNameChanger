@@ -17,6 +17,9 @@ public final class Messages {
     public static final String ERROR_NO_FORMAT_PERM = PREFIX + "error.noFormatPermission";
     public static final String ERROR_BANNED_WORD = PREFIX + "error.bannedWord";
     public static final String ERROR_NICKNAME_TAKEN = PREFIX + "error.nicknameTaken";
+    public static final String ERROR_INVALID_CHARACTERS = PREFIX + "error.invalidCharacters";
+    public static final String ERROR_REAL_USERNAME = PREFIX + "error.realUsername";
+    public static final String ERROR_NOT_SAVED = PREFIX + "error.notSaved";
     public static final String ERROR_NO_SETTINGS_PERM = PREFIX + "error.noSettingsPermission";
 
     // Nickname
