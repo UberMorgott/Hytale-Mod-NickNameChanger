@@ -23,10 +23,11 @@
 ### Added
 - **Nickname rules** (invalid rules disable nickname changes instead of loosening them; `nickname.format` is checked for the editor's text field too): `Nicknames.AllowedCharactersRegex`, `Nicknames.BlockRealUsernames` (nickname can't be another known player's real name, also offline players); uniqueness is checked atomically; symbols like `& % { } < >` are always rejected. Invalid nicknames are rejected with a reason instead of silently changed.
 - **Chat plugin adapters** (all optional, no PlaceholderAPI needed):
-  - **mini-chat-formatter** 0.1.x: `<username>` shows the nickname; LP/PAPI tags keep working.
+  - **mini-chat-formatter** 0.1.x: `<username>` shows the nickname, `<message>` gets the message color; LP/PAPI tags keep working.
   - **EssentialsPlus**: nickname synced into EP's `{player}` (EP accepts only A-Z, 0-9, _; refusals are reported), message color restored; a player's own EP nickname is kept and restored.
   - **EliteEssentials**: nickname synced into EE's `{player}`.
   - Startup log line with detected integrations and which plugin formats chat.
+- **LuckPerms permissions**: nodes that are not set use NNC's defaults (LP used to deny them).
 - **`nickname.msgcolor` permission** for `/nick msgcolor` and the editor's message tab, separate from `nickname.format`.
 - **PlaceholderAPI (HelpChat, optional)**: `%nnc_nickname%`, `%nnc_nickname_mini%`, `%nnc_nickname_legacy%` (follow `ShowInChat`), `%nnc_nameplate%`, `%nnc_has_nickname%`, `%nnc_realname%`, `%nnc_msgcolor_open%`, `%nnc_msgcolor_close%`, `%nnc_msgcolor_legacy%`.
 - External `%placeholders%` in NNC's `ChatFormat` (e.g. KyuubiSoft titles via the title bridge, MysticNameTags tags).

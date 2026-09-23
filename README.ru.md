@@ -61,7 +61,7 @@
 
 ### Как работают права
 
-`nickname.use`, `nickname.format` и `nickname.msgcolor` **разрешены по умолчанию** — мод работает сразу без настройки. Для ограничения используйте префикс `-`.
+`nickname.use`, `nickname.format` и `nickname.msgcolor` **разрешены по умолчанию** — мод работает сразу без настройки (с LuckPerms тоже: незаданные права берут это значение). Для ограничения используйте префикс `-`.
 
 `nickname.admin` **запрещено по умолчанию** — доступ к панели настроек есть только у тех, кому право выдано явно. Это функция только для администраторов.
 
@@ -283,10 +283,10 @@ if (NicknameAPI.isShowInChat() && NicknameAPI.hasNickname(uuid)) {
 | Установлено (кроме NNC) | Кто форматирует чат | Никнейм в чате | Что сделать |
 |-------------------------|---------------------|----------------|-------------|
 | ничего / LuckPerms | NNC (`ChatFormat`, prefix/suffix LP) | ✅ цвета + цвет сообщений | Ничего. В старых бетах LuckPerms 5.5.28 был свой форматтер чата — `chat-formatter.enabled: false`. |
-| mini-chat-formatter (+ LP, + PAPI) | MCF | ✅ `<username>` показывает никнейм (MCF 0.1.x) | Ничего. Другие версии MCF: `%nnc_nickname_mini%` (нужен PlaceholderAPI). |
+| mini-chat-formatter (+ LP, + PAPI) | MCF | ✅ `<username>` показывает никнейм, `<message>` получает цвет сообщений (MCF 0.1.x) | Ничего. Другие версии MCF: `%nnc_nickname_mini%` (нужен PlaceholderAPI). |
 | EssentialsPlus (+ LP, + MCF, + PAPI) | EP (если `chat.enabled`) | ✅ синхронизируется в `{player}` EP + цвет сообщений | Ничего. EP принимает только A-Z, 0-9, `_`; другие никнеймы EP отклоняет (игрок получает сообщение) — для них `%nnc_nickname_mini%` в формате EP (нужен PlaceholderAPI). |
-| EliteEssentials (+ LP, + PAPI) | EE (если включён `chatFormat`) | ✅ синхронизируется в `{player}` EE | Ничего. Цвет сообщений: `%nnc_msgcolor_legacy%` перед `{message}` (PlaceholderAPI). |
-| HyperPerms | HyperPerms | ✅ через `%nnc_nickname%` | Замените `%player%` на `%nnc_nickname%` в формате чата HyperPerms (регистрирует NNC, PlaceholderAPI не нужен). |
+| EliteEssentials (+ LP, + PAPI) | EE (если включён `chatFormat`) | ✅ синхронизируется в `{player}` EE | Для никнеймов ничего. **Цвет сообщений не автоматически**: установите PlaceholderAPI и поставьте `%nnc_msgcolor_legacy%` прямо перед `{message}` в форматах чата EE. |
+| HyperPerms | HyperPerms | ✅ через `%nnc_nickname%` | Замените `%player%` на `%nnc_nickname%` в формате чата HyperPerms (регистрирует NNC, PlaceholderAPI не нужен). **Важно:** HyperPerms 2.10.0 ещё не обновлён под Hytale 0.6.8 (сам падает с `NoSuchMethodError ServerPlayerListPlayer.<init>`). |
 | Титулы KyuubiSoft | NNC | ✅ | Kyuubi Chat Title Bridge (CurseForge 1581560) + PlaceholderAPI, в `ChatFormat` добавьте, например, `%ks_title_raw% `; в Kyuubi `displayMode` = `nametag` или `none`. |
 | MysticNameTags | NNC | ✅ | Теги в чате: `%mystictags_tag%` в `ChatFormat`. Таблички Mystic: `ShowOnNameplate` = false в NNC и `%nnc_nameplate%` в формате табличек Mystic. |
 

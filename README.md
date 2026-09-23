@@ -37,7 +37,7 @@ A Hytale server plugin that lets players customize their display nickname with c
 | `nickname.msgcolor` | true | Set a chat message color (clearing it is always allowed) |
 | `nickname.admin` | false | Access settings panel |
 
-"Default true" means allowed unless the node is explicitly set to false (e.g. LuckPerms: `/lp group default permission set nickname.msgcolor false`).
+"Default true" means allowed unless the node is explicitly set to false (e.g. LuckPerms: `/lp group default permission set nickname.msgcolor false`). With LuckPerms, nodes that are not set at all use these defaults.
 
 ## Which chat plugin works with LuckPerms + NNC?
 
@@ -46,10 +46,10 @@ Every integration is optional: NNC works alone and with any combination of the p
 | Installed (besides NNC) | Who formats chat | Nickname in chat | What to do |
 |-------------------------|------------------|------------------|------------|
 | nothing / LuckPerms | NNC (`ChatFormat`, LP prefix/suffix) | ✅ colors + message color | Nothing. Old LuckPerms 5.5.28 betas had their own chat formatter: set `chat-formatter.enabled: false` in LP. |
-| mini-chat-formatter (+ LP, + PAPI) | MCF | ✅ `<username>` shows the nickname (MCF 0.1.x) | Nothing. Other MCF versions: use `%nnc_nickname_mini%` (needs PlaceholderAPI). |
+| mini-chat-formatter (+ LP, + PAPI) | MCF | ✅ `<username>` shows the nickname, `<message>` gets the message color (MCF 0.1.x) | Nothing. Other MCF versions: use `%nnc_nickname_mini%` (needs PlaceholderAPI). |
 | EssentialsPlus (+ LP, + MCF, + PAPI) | EP (when EP `chat.enabled`) | ✅ synced into EP's `{player}` + message color | Nothing. EP only accepts nicknames with A-Z, 0-9, `_`; others are refused (the player is told), use `%nnc_nickname_mini%` in EP's format for those (needs PlaceholderAPI). |
-| EliteEssentials (+ LP, + PAPI) | EE (when its `chatFormat` is enabled) | ✅ synced into EE's `{player}` | Nothing. Message color: `%nnc_msgcolor_legacy%` before `{message}` (PlaceholderAPI). |
-| HyperPerms | HyperPerms | ✅ with `%nnc_nickname%` | Replace `%player%` with `%nnc_nickname%` in HyperPerms' chat format (registered by NNC, no PlaceholderAPI needed). |
+| EliteEssentials (+ LP, + PAPI) | EE (when its `chatFormat` is enabled) | ✅ synced into EE's `{player}` | Nothing for nicknames. **Message color is not automatic**: install PlaceholderAPI and put `%nnc_msgcolor_legacy%` right before `{message}` in EE's chat formats. |
+| HyperPerms | HyperPerms | ✅ with `%nnc_nickname%` | Replace `%player%` with `%nnc_nickname%` in HyperPerms' chat format (registered by NNC, no PlaceholderAPI needed). **Note:** HyperPerms 2.10.0 is not yet updated for Hytale 0.6.8 (it fails with `NoSuchMethodError ServerPlayerListPlayer.<init>` on its own). |
 | KyuubiSoft titles | NNC | ✅ | Install the Kyuubi Chat Title Bridge (CurseForge 1581560) + PlaceholderAPI, add e.g. `%ks_title_raw% ` to NNC's `ChatFormat`; set Kyuubi `displayMode` to `nametag` or `none`. |
 | MysticNameTags | NNC | ✅ | Tags in chat: `%mystictags_tag%` in `ChatFormat`. Mystic-owned nameplates: NNC `ShowOnNameplate` = false, `%nnc_nameplate%` in Mystic's nameplate format. |
 
