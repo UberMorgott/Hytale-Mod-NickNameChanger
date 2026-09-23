@@ -1,7 +1,5 @@
 package com.nickname.plugin.hooks;
 
-import com.hypixel.hytale.server.core.plugin.PluginManager;
-import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.UUID;
@@ -9,7 +7,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.logging.Level;
 
 /**
- * Safe facade for optional LuckPerms integration.
+ * Safe facade for optional LuckPerms integration (prefix / suffix in NNC's chat format).
  * All direct LuckPerms API references are in {@link com.nickname.plugin.compat.LuckPermsCompat},
  * which the JVM only loads when LuckPerms is actually present.
  */
@@ -17,50 +15,28 @@ public class LuckPermsHook {
 
     private static final HytaleLogger LOGGER = HytaleLogger.get("NicknameChanger");
 
-    private static volatile boolean initialized = false;
     private static volatile boolean available = false;
-    private static volatile boolean configEnabled = true;
 
+    /** Called once from plugin start(); LuckPerms is an optional dependency, so it is loaded before us. */
     public static void init(boolean enabled) {
-        configEnabled = enabled;
         if (!enabled) {
-            initialized = true;
-            available = false;
             LOGGER.at(Level.INFO).log("LuckPerms integration disabled in config.");
             return;
         }
-        tryInit();
-    }
-
-    private static void tryInit() {
-        if (available || !configEnabled) {
+        if (!PluginDetector.isLoaded(PluginDetector.LUCKPERMS)) {
+            LOGGER.at(Level.INFO).log("LuckPerms not found, running without it.");
             return;
         }
         try {
-            PluginManager pm = PluginManager.get();
-            if (pm == null || pm.getPlugin(new PluginIdentifier("LuckPerms", "LuckPerms")) == null) {
-                throw new IllegalStateException("LuckPerms not loaded");
-            }
             com.nickname.plugin.compat.LuckPermsCompat.init();
-            boolean wasUnavailable = !available;
             available = true;
-            if (!initialized) {
-                LOGGER.at(Level.INFO).log("LuckPerms integration enabled!");
-                initialized = true;
-            } else if (wasUnavailable) {
-                LOGGER.at(Level.INFO).log("LuckPerms integration enabled (late binding)!");
-            }
+            LOGGER.at(Level.INFO).log("LuckPerms integration enabled!");
         } catch (IllegalStateException | NoClassDefFoundError e) {
-            if (!initialized) {
-                LOGGER.at(Level.INFO).log("LuckPerms not found, running without it.");
-                initialized = true;
-            }
-            available = false;
+            LOGGER.at(Level.WARNING).withCause(e).log("LuckPerms API not available, running without it.");
         }
     }
 
     public static boolean isAvailable() {
-        tryInit();
         return available;
     }
 
@@ -73,7 +49,7 @@ public class LuckPermsHook {
 
     @Nullable
     public static String getPrefix(@Nonnull UUID uuid) {
-        if (!isAvailable()) return null;
+        if (!available) return null;
         try {
             return com.nickname.plugin.compat.LuckPermsCompat.getPrefix(uuid);
         } catch (NoClassDefFoundError | Exception e) {
@@ -84,25 +60,12 @@ public class LuckPermsHook {
 
     @Nullable
     public static String getSuffix(@Nonnull UUID uuid) {
-        if (!isAvailable()) return null;
+        if (!available) return null;
         try {
             return com.nickname.plugin.compat.LuckPermsCompat.getSuffix(uuid);
         } catch (NoClassDefFoundError | Exception e) {
             disableHook(e);
             return null;
         }
-    }
-
-    public static void setDisplayName(@Nonnull UUID uuid, @Nullable String displayName) {
-        if (!isAvailable()) return;
-        try {
-            com.nickname.plugin.compat.LuckPermsCompat.setDisplayName(uuid, displayName);
-        } catch (NoClassDefFoundError | Exception e) {
-            disableHook(e);
-        }
-    }
-
-    public static void removeDisplayName(@Nonnull UUID uuid) {
-        setDisplayName(uuid, null);
     }
 }

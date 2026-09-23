@@ -11,10 +11,15 @@ import com.hypixel.hytale.server.core.universe.world.events.AddWorldEvent;
 
 import com.nickname.plugin.api.NicknameAPI;
 import com.nickname.plugin.commands.NickCommand;
+import com.hypixel.hytale.common.plugin.PluginIdentifier;
+import com.nickname.plugin.compat.HyperPermsCompat;
+import com.nickname.plugin.compat.NicknamePlaceholders;
 import com.nickname.plugin.config.ConfigMigration;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.display.NicknameDisplay;
 import com.nickname.plugin.hooks.LuckPermsHook;
+import com.nickname.plugin.hooks.PlaceholderApiHook;
+import com.nickname.plugin.hooks.PluginDetector;
 import com.nickname.plugin.listeners.ChatListener;
 import com.nickname.plugin.listeners.PlayerListener;
 import com.nickname.plugin.service.NicknameService;
@@ -85,12 +90,12 @@ public class NicknameChanger extends JavaPlugin {
 
     @Override
     protected void start() {
-        // Initialize optional integrations after all plugins are enabled
-        try {
-            LuckPermsHook.init(config.integrations.luckperms.enabled);
-        } catch (NoClassDefFoundError e) {
-            getLogger().at(Level.INFO).log("LuckPerms not found, running without it.");
-        }
+        // Optional integrations: every plugin is set up by now
+        LuckPermsHook.init(config.integrations.luckperms.enabled);
+        NicknamePlaceholders placeholders = new NicknamePlaceholders(storage);
+        PlaceholderApiHook.init(placeholders, getManifest().getVersion().toString());
+        HyperPermsCompat.register(placeholders);
+        logChatPluginHints();
         display.start();
     }
 
@@ -98,6 +103,23 @@ public class NicknameChanger extends JavaPlugin {
     protected void shutdown() {
         if (display != null) {
             display.stop();
+        }
+        PlaceholderApiHook.shutdown();
+        HyperPermsCompat.unregister();
+    }
+
+    /** Chat plugins that format chat themselves need NNC's placeholders in their own format. */
+    private void logChatPluginHints() {
+        for (PluginIdentifier chatPlugin : new PluginIdentifier[]{
+                PluginDetector.MINI_CHAT_FORMATTER, PluginDetector.ESSENTIALS_PLUS, PluginDetector.ELITE_ESSENTIALS}) {
+            if (!PluginDetector.isLoaded(chatPlugin)) continue;
+            if (PlaceholderApiHook.isAvailable()) {
+                getLogger().at(Level.INFO).log("%s formats chat: put %%nnc_nickname_mini%% (or %%nnc_nickname_legacy%%) "
+                    + "into its chat format to show nicknames.", chatPlugin);
+            } else {
+                getLogger().at(Level.WARNING).log("%s formats chat, so nicknames are not shown there. Install PlaceholderAPI "
+                    + "(HelpChat) and use %%nnc_nickname_mini%% in its chat format.", chatPlugin);
+            }
         }
     }
 

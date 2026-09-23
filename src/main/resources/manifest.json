@@ -12,10 +12,9 @@
   "ServerVersion": ">=2025.01.01",
   "Dependencies": {},
   "OptionalDependencies": {
-    "Zoltus:TinyMessage": "*",
     "LuckPerms:LuckPerms": "*",
-    "lucko:MiniChatFormatter": "*",
-    "fof1092:EssentialsPlus": "*"
+    "HelpChat:PlaceholderAPI": "*",
+    "com.hyperperms:HyperPerms": "*"
   },
   "DisabledByDefault": false,
   "IncludesAssetPack": true

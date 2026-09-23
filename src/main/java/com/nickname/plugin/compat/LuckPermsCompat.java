@@ -4,11 +4,6 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.cacheddata.CachedMetaData;
 import net.luckperms.api.model.user.User;
-import net.luckperms.api.model.user.UserManager;
-import net.luckperms.api.node.NodeType;
-import net.luckperms.api.node.types.MetaNode;
-
-import com.nickname.plugin.util.MessageUtil;
 
 import java.util.UUID;
 
@@ -25,46 +20,19 @@ public class LuckPermsCompat {
         luckPerms = LuckPermsProvider.get();
     }
 
-    /**
-     * Resolves a LuckPerms User by UUID.
-     * When allowBlocking is false, only checks the in-memory cache (safe for hot paths like chat).
-     * When allowBlocking is true, falls back to loading from storage if not cached.
-     */
-    private static User resolveUser(UUID uuid, boolean allowBlocking) {
+    /** Metadata of an online (cached) user only; never loads from storage, safe on the chat thread. */
+    private static CachedMetaData cachedMeta(UUID uuid) {
         User user = luckPerms.getUserManager().getUser(uuid);
-        if (user == null && allowBlocking) {
-            try {
-                user = luckPerms.getUserManager().loadUser(uuid).join();
-            } catch (Exception e) {
-                return null;
-            }
-        }
-        return user;
+        return user != null ? user.getCachedData().getMetaData() : null;
     }
 
     public static String getPrefix(UUID uuid) {
-        User user = resolveUser(uuid, false);
-        if (user == null) return null;
-        CachedMetaData metaData = user.getCachedData().getMetaData();
-        return metaData.getPrefix();
+        CachedMetaData meta = cachedMeta(uuid);
+        return meta != null ? meta.getPrefix() : null;
     }
 
     public static String getSuffix(UUID uuid) {
-        User user = resolveUser(uuid, false);
-        if (user == null) return null;
-        CachedMetaData metaData = user.getCachedData().getMetaData();
-        return metaData.getSuffix();
-    }
-
-    public static void setDisplayName(UUID uuid, String displayName) {
-        UserManager userManager = luckPerms.getUserManager();
-        userManager.modifyUser(uuid, user -> {
-            user.data().clear(NodeType.META.predicate(mn -> mn.getMetaKey().equals("display-name")));
-            if (displayName != null && !displayName.isEmpty()) {
-                String cleanName = MessageUtil.stripTags(displayName);
-                MetaNode node = MetaNode.builder("display-name", cleanName).build();
-                user.data().add(node);
-            }
-        });
+        CachedMetaData meta = cachedMeta(uuid);
+        return meta != null ? meta.getSuffix() : null;
     }
 }

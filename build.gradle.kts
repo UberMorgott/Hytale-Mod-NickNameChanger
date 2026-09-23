@@ -9,12 +9,15 @@ version = "0.0.17"
 repositories {
     mavenCentral()
     maven("https://maven.hytale.com/release")
+    maven("https://repo.helpch.at/releases") // HelpChat PlaceholderAPI (Hytale)
 }
 
 dependencies {
     compileOnly("com.hypixel.hytale:Server:0.6.8")
     // LuckPerms-Hytale ships the standard LuckPerms API (net.luckperms.api)
     compileOnly("net.luckperms:api:5.4")
+    // Optional: %nnc_...% placeholders; classes are only loaded when PlaceholderAPI is installed
+    compileOnly("at.helpch:placeholderapi-hytale:1.0.8")
     implementation("com.google.code.gson:gson:2.10.1")
 
     testImplementation("com.hypixel.hytale:Server:0.6.8")

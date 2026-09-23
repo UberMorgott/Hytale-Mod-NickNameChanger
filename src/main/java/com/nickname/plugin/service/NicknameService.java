@@ -10,7 +10,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.display.NicknameDisplay;
-import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.i18n.Messages;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
@@ -68,9 +67,7 @@ public final class NicknameService {
             return false;
         }
 
-        if (LuckPermsHook.isAvailable()) {
-            LuckPermsHook.setDisplayName(uuid, result.nickname());
-        }
+
         display.refresh(ref, store, playerRef);
 
         playerRef.sendMessage(Message.join(
@@ -91,9 +88,7 @@ public final class NicknameService {
         storage.removeNickname(uuid);
         storage.removeMessageColor(uuid);
 
-        if (LuckPermsHook.isAvailable()) {
-            LuckPermsHook.removeDisplayName(uuid);
-        }
+
         display.refresh(ref, store, playerRef);
 
         playerRef.sendMessage(Message.join(

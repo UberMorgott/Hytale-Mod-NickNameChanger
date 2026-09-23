@@ -9,6 +9,7 @@ import com.nickname.plugin.chat.ChatFormatParser;
 import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.hooks.LuckPermsHook;
+import com.nickname.plugin.hooks.PlaceholderApiHook;
 import com.nickname.plugin.util.MessageUtil;
 import com.nickname.plugin.storage.NicknameStorage;
 
@@ -70,8 +71,11 @@ public class ChatListener {
                 ? storage.getMessageColor(senderUuid) : null;
         boolean hasMsgColor = msgColor != null;
 
+        // External placeholders (e.g. %ks_title_raw%, %mystictags_tag%) can be in the format itself
+        boolean hasExternalPlaceholders = PlaceholderApiHook.isAvailable() && config.chatFormat.indexOf('%') >= 0;
+
         // Skip if nothing to contribute
-        if (!hasNickname && !hasLpData && !hasMsgColor) {
+        if (!hasNickname && !hasLpData && !hasMsgColor && !hasExternalPlaceholders) {
             return;
         }
 
@@ -106,7 +110,9 @@ public class ChatListener {
                             break;
                     }
                 } else {
-                    result = result.insert(MessageUtil.parse(token.value, "#AAAAAA"));
+                    // Only the configured format goes through PlaceholderAPI, never the player's text
+                    String text = PlaceholderApiHook.apply(playerRef, token.value);
+                    result = result.insert(MessageUtil.parse(text, "#AAAAAA"));
                 }
             }
 
