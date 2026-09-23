@@ -267,6 +267,13 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
             currentNickname = data.nickname;
         }
 
+        // Permissions may have been revoked while the page was open
+        if (("apply".equals(data.action) || "reset".equals(data.action))
+                && !PermissionsModule.get().hasPermission(playerRef.getUuid(), NickCommand.PERM_USE, true)) {
+            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_USE_PERM)).color("#FF5555"));
+            playerComponent.getPageManager().setPage(ref, store, Page.None);
+            return;
+        }
         if (data.action != null) {
             switch (data.action) {
                 case "nickname_changed" -> {

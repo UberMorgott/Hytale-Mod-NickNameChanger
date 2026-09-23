@@ -14,6 +14,7 @@ public final class Messages {
     public static final String ERROR_MIN_LENGTH = PREFIX + "error.minLength";
     public static final String ERROR_MAX_LENGTH = PREFIX + "error.maxLength";
     public static final String ERROR_INVALID = PREFIX + "error.invalid";
+    public static final String ERROR_NO_USE_PERM = PREFIX + "error.noPermission";
     public static final String ERROR_NO_FORMAT_PERM = PREFIX + "error.noFormatPermission";
     public static final String ERROR_NO_MSGCOLOR_PERM = PREFIX + "error.noMsgColorPermission";
     public static final String ERROR_BANNED_WORD = PREFIX + "error.bannedWord";

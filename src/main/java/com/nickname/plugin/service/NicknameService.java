@@ -52,6 +52,11 @@ public final class NicknameService {
         if (!result.isValid()) {
             error(playerRef, Messages.get(playerRef, result.errorKey(), result.args()));
             return false;
+        }        // Checked here, not in the UI: the editor's text field can carry tags too
+        if (MessageUtil.hasMarkup(result.nickname())
+                && !PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_FORMAT, true)) {
+            error(playerRef, Messages.get(playerRef, Messages.ERROR_NO_FORMAT_PERM));
+            return false;
         }
 
         NicknameStorage.ClaimResult claim = storage.claimNickname(uuid, result.nickname(), result.plain(),

@@ -9,6 +9,7 @@ command.description = Definir seu apelido de exibição
 error.minLength = O apelido deve ter pelo menos {min} caracteres.
 error.maxLength = O apelido não pode exceder {max} caracteres.
 error.invalid = Apelido inválido.
+error.noPermission = Você não tem permissão para mudar seu apelido.
 error.noFormatPermission = Você não tem permissão para usar cores e estilos.
 error.noMsgColorPermission = Você não tem permissão para mudar a cor das mensagens.
 error.bannedWord = Este apelido contém uma palavra proibida.

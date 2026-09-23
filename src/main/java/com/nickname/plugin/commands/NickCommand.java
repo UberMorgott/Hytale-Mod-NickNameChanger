@@ -19,7 +19,6 @@ import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.ui.NicknameEditorPage;
 import com.nickname.plugin.ui.NicknameSettingsPage;
-import com.nickname.plugin.util.MessageUtil;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -101,11 +100,6 @@ public class NickCommand extends AbstractPlayerCommand {
             return;
         }
 
-        // Check format permission if nickname contains markup (default: allowed)
-        if (MessageUtil.hasMarkup(arg) && !PermissionsModule.get().hasPermission(playerUuid, PERM_FORMAT, true)) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_FORMAT_PERM)).color("#FF5555"));
-            return;
-        }
         service.setNickname(ref, store, playerRef, arg);
     }
 
