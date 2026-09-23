@@ -12,9 +12,10 @@ import java.util.UUID;
 /**
  * Values of the {@code %nnc_...%} placeholders, independent of any placeholder plugin:
  * <ul>
- *   <li>{@code nickname} – nickname as plain text, or the real name</li>
+ *   <li>{@code nickname} – nickname as plain text, or the real name (also when Display.ShowInChat is off)</li>
  *   <li>{@code nickname_mini} – with colors as MiniMessage / EssentialsPlus tags</li>
  *   <li>{@code nickname_legacy} – with colors as {@code &#RRGGBB} / {@code &l} codes</li>
+ *   <li>{@code nameplate} – nickname as plain text regardless of ShowInChat (for nameplate plugins)</li>
  *   <li>{@code has_nickname} – true / false</li>
  *   <li>{@code realname} – the real username</li>
  *   <li>{@code msgcolor_open}, {@code msgcolor_close} – MiniMessage tags to put around the message</li>
@@ -33,11 +34,13 @@ public final class NicknamePlaceholders {
     @Nullable
     public String resolve(@Nonnull UUID uuid, @Nonnull String realName, @Nonnull String name) {
         String nickname = storage.getNickname(uuid);
-        String styled = nickname != null ? nickname : realName;
+        // Chat placeholders follow Display.ShowInChat like NNC's own chat format
+        String chatName = nickname != null && storage.isShowInChat() ? nickname : realName;
         return switch (name) {
-            case "nickname" -> MessageUtil.stripTags(styled);
-            case "nickname_mini" -> MessageUtil.toMiniMessage(styled);
-            case "nickname_legacy" -> MessageUtil.toLegacy(styled);
+            case "nickname" -> MessageUtil.stripTags(chatName);
+            case "nickname_mini" -> MessageUtil.toMiniMessage(chatName);
+            case "nickname_legacy" -> MessageUtil.toLegacy(chatName);
+            case "nameplate" -> MessageUtil.stripTags(nickname != null ? nickname : realName);
             case "has_nickname" -> String.valueOf(nickname != null);
             case "realname" -> realName;
             case "msgcolor_open" -> messageColorTag(uuid, false);
