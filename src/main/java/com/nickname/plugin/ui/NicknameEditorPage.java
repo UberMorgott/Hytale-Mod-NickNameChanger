@@ -270,7 +270,10 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
         if (data.action != null) {
             switch (data.action) {
                 case "nickname_changed" -> {
-                    // Just update preview, nickname already set above
+                    // Keep the draft only. Sending a UI update per keystroke makes the server ignore
+                    // clicks until the client acknowledges it (PageManager), so Apply/Reset got lost.
+                    // The preview refreshes on the next button or color change; Apply sends the field value.
+                    return;
                 }
                 case "apply" -> {
                     if (applyNickname(ref, store)) {
