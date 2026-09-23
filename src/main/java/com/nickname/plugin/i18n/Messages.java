@@ -23,6 +23,7 @@ public final class Messages {
     public static final String ERROR_REAL_USERNAME = PREFIX + "error.realUsername";
     public static final String ERROR_NOT_SAVED = PREFIX + "error.notSaved";
     public static final String ERROR_RULES_INVALID = PREFIX + "error.rulesInvalid";
+    public static final String ERROR_ESSENTIALSPLUS = PREFIX + "error.essentialsPlus";
     public static final String ERROR_NO_SETTINGS_PERM = PREFIX + "error.noSettingsPermission";
 
     // Nickname

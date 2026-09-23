@@ -18,6 +18,7 @@ error.invalidCharacters = O apelido contém caracteres não permitidos.
 error.realUsername = Este é o nome de outro jogador.
 error.notSaved = Não foi possível salvar a alteração, avise um administrador (veja o log do servidor).
 error.rulesInvalid = Apelidos desativados: as regras de apelido no config.json são inválidas. Avise um administrador.
+error.essentialsPlus = O chat do EssentialsPlus não pode mostrar este apelido ({reason}).
 
 # Informações do apelido atual
 current.nickname = Seu apelido atual:

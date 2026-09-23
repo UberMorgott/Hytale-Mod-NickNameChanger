@@ -61,5 +61,7 @@ class MessageUtilTest {
         assertEquals("<#FF5555><bold>Bob</bold></#FF5555>", MessageUtil.toMiniMessage(nick));
         assertEquals("&#FF5555&lBob", MessageUtil.toLegacy(nick));
         assertEquals("Bob", MessageUtil.toLegacy("Bob"));
+        assertEquals("<#FF5555>Bob</#FF5555>", MessageUtil.toEssentialsPlus(nick));
+        assertEquals("Bob", MessageUtil.toEssentialsPlus("<b>Bob</b>"));
     }
 }

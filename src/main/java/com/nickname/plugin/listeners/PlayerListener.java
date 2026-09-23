@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.display.NicknameDisplay;
 import com.nickname.plugin.i18n.Messages;
+import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
 
@@ -25,11 +26,13 @@ public class PlayerListener {
     private final NicknameStorage storage;
     private final PluginConfig config;
     private final NicknameDisplay display;
+    private final NicknameService service;
 
-    public PlayerListener(NicknameStorage storage, PluginConfig config, NicknameDisplay display) {
+    public PlayerListener(NicknameStorage storage, PluginConfig config, NicknameDisplay display, NicknameService service) {
         this.storage = storage;
         this.config = config;
         this.display = display;
+        this.service = service;
     }
 
     /**
@@ -66,8 +69,9 @@ public class PlayerListener {
             display.applyNameplate(ref, store, playerRef);
         }
 
-        // Greet once per login, not on every world change
+        // Once per login, not on every world change
         if (event.getReadyId() == 0) {
+            service.syncOnJoin(playerRef);
             playerRef.sendMessage(Message.join(
                 Message.raw(Messages.get(playerRef, Messages.WELCOME_NICKNAME) + " ").color("#55FF55"),
                 MessageUtil.parse(nickname)

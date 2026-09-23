@@ -134,6 +134,22 @@ public final class MessageUtil {
         return out.toString();
     }
 
+    /**
+     * Colors only, as EssentialsPlus markup ({@code <#RRGGBB>text</#RRGGBB>}), for EssentialsPlus'
+     * own nickname. Styles are left out: EP breaks them inside its chat format's color tags.
+     */
+    @Nonnull
+    public static String toEssentialsPlus(@Nonnull String input) {
+        StringBuilder out = new StringBuilder();
+        for (Segment s : segments(input)) {
+            if (s.color() == null) {
+                out.append(s.text());
+            } else {
+                out.append('<').append(s.color()).append('>').append(s.text()).append("</").append(s.color()).append('>');
+            }
+        }
+        return out.toString();
+    }
     /** Same styling as legacy codes ({@code &#RRGGBB}, {@code &l}, {@code &o}, {@code &n}). */
     @Nonnull
     public static String toLegacy(@Nonnull String input) {

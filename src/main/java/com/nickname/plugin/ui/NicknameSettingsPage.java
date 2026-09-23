@@ -19,7 +19,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.NicknameChanger;
 import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.config.PluginConfig;
-import com.nickname.plugin.display.NicknameDisplay;
+import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.i18n.Messages;
 
 import javax.annotation.Nonnull;
@@ -28,15 +28,15 @@ import java.util.logging.Level;
 public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettingsPage.EventData> {
 
     private final PluginConfig config;
-    private final NicknameDisplay display;
+    private final NicknameService service;
     private boolean showInChat;
     private boolean showOnNameplate;
     private boolean showInTabList;
 
-    public NicknameSettingsPage(@Nonnull PluginConfig config, @Nonnull NicknameDisplay display, @Nonnull PlayerRef playerRef) {
+    public NicknameSettingsPage(@Nonnull PluginConfig config, @Nonnull NicknameService service, @Nonnull PlayerRef playerRef) {
         super(playerRef, CustomPageLifetime.CanDismissOrCloseThroughInteraction, EventData.CODEC);
         this.config = config;
-        this.display = display;
+        this.service = service;
 
         this.showInChat = config.display.showInChat;
         this.showOnNameplate = config.display.showOnNameplate;
@@ -84,7 +84,7 @@ public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettin
                         config.display.showInChat = showInChat;
                         config.display.showOnNameplate = showOnNameplate;
                         config.display.showInTabList = showInTabList;
-                        display.refreshAll();
+                        service.reapplyAll();
                         NicknameChanger.getInstance().getConfigHolder().save().whenComplete((ignored, error) -> {
                             if (error == null) {
                                 playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.SETTINGS_SAVED)).color("#55FF55"));

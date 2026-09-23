@@ -13,7 +13,6 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.config.PluginConfig;
-import com.nickname.plugin.display.NicknameDisplay;
 import com.nickname.plugin.i18n.Messages;
 import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
@@ -33,16 +32,14 @@ public class NickCommand extends AbstractPlayerCommand {
 
     private final NicknameStorage storage;
     private final PluginConfig config;
-    private final NicknameDisplay display;
     private final NicknameService service;
 
-    public NickCommand(NicknameStorage storage, PluginConfig config, NicknameDisplay display, NicknameService service) {
+    public NickCommand(NicknameStorage storage, PluginConfig config, NicknameService service) {
         // "nnc" is unique to this plugin; "nick"/"nickname" still work unless another plugin
         // (EliteEssentials, EssentialsPlus, ...) registers a command with that name.
         super("nnc", "Set your display nickname");
         this.storage = storage;
         this.config = config;
-        this.display = display;
         this.service = service;
         setAllowsExtraArguments(true);
         addAliases("nick", "nickname");
@@ -79,7 +76,7 @@ public class NickCommand extends AbstractPlayerCommand {
                 playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_SETTINGS_PERM)).color("#FF5555"));
                 return;
             }
-            openPage(ref, store, new NicknameSettingsPage(config, display, playerRef));
+            openPage(ref, store, new NicknameSettingsPage(config, service, playerRef));
             return;
         }
 

@@ -18,6 +18,7 @@ error.invalidCharacters = Никнейм содержит недопустимы
 error.realUsername = Это имя другого игрока.
 error.notSaved = Не удалось сохранить изменение, сообщите администратору (подробности в логе сервера).
 error.rulesInvalid = Никнеймы отключены: правила никнеймов в config.json заданы неверно. Сообщите администратору.
+error.essentialsPlus = Чат EssentialsPlus не может показать этот никнейм ({reason}).
 
 # Информация о текущем никнейме
 current.nickname = Ваш текущий никнейм:

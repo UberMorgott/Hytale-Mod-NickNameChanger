@@ -6,8 +6,10 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.commands.NickCommand;
+import com.nickname.plugin.compat.EssentialsPlusCompat;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.display.NicknameDisplay;
 import com.nickname.plugin.i18n.Messages;
@@ -36,11 +38,15 @@ public final class NicknameService {
     private final PluginConfig config;
     private final NicknameDisplay display;
     private final NicknameValidator validator;
+    @Nullable
+    private final EssentialsPlusCompat essentialsPlus;
 
-    public NicknameService(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config, @Nonnull NicknameDisplay display) {
+    public NicknameService(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config, @Nonnull NicknameDisplay display,
+                           @Nullable EssentialsPlusCompat essentialsPlus) {
         this.storage = storage;
         this.config = config;
         this.display = display;
+        this.essentialsPlus = essentialsPlus;
         this.validator = new NicknameValidator(config.nicknames, message -> LOGGER.at(Level.SEVERE).log(message));
     }
 
@@ -59,6 +65,7 @@ public final class NicknameService {
             return false;
         }
 
+        String previous = storage.getNickname(uuid);
         NicknameStorage.ClaimResult claim = storage.claimNickname(uuid, result.nickname(), result.plain(),
             config.nicknames.uniqueNicknames, config.nicknames.blockRealUsernames);
         String claimError = switch (claim) {
@@ -78,6 +85,7 @@ public final class NicknameService {
             Message.raw(Messages.get(playerRef, Messages.SET_SUCCESS) + " ").color("#55FF55"),
             MessageUtil.parse(result.nickname())
         ));
+        syncEssentialsPlus(playerRef, previous);
         return true;
     }
 
@@ -89,6 +97,7 @@ public final class NicknameService {
             return;
         }
 
+        String previous = storage.getNickname(uuid);
         if (!storage.removeNickname(uuid)) {
             error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
             return;
@@ -99,6 +108,7 @@ public final class NicknameService {
             Message.raw(Messages.get(playerRef, Messages.RESET_SUCCESS) + " ").color("#55FF55"),
             Message.raw(playerRef.getUsername()).color("#FFFFFF")
         ));
+        syncEssentialsPlus(playerRef, previous);
         if (!storage.removeMessageColor(uuid)) {
             error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
         }
@@ -158,6 +168,35 @@ public final class NicknameService {
             return MessageUtil.parse("<gradient:" + parts[1] + ":" + parts[2] + ">Example text</gradient>");
         }
         return Message.raw("Example text").color(color);
+    }
+
+    /** EssentialsPlus shows its own nickname in its chat; keep it equal to ours and say so if EP refuses. */
+    private void syncEssentialsPlus(@Nonnull PlayerRef playerRef, @Nullable String previousNickname) {
+        if (essentialsPlus == null) return;
+        String refusal = essentialsPlus.sync(playerRef.getUuid(), previousNickname);
+        if (refusal != null) {
+            error(playerRef, Messages.get(playerRef, Messages.ERROR_ESSENTIALSPLUS, "reason", refusal));
+        }
+    }
+
+    /** On join (EP has loaded the player by PlayerReady): make EP's nickname match. Refusals are logged. */
+    public void syncOnJoin(@Nonnull PlayerRef playerRef) {
+        if (essentialsPlus == null) return;
+        String refusal = essentialsPlus.sync(playerRef.getUuid(), null);
+        if (refusal != null) {
+            LOGGER.at(Level.INFO).log("EssentialsPlus chat can't show the nickname of %s: %s", playerRef.getUsername(), refusal);
+        }
+    }
+
+    /** After display settings changed: nameplates / tab list and EssentialsPlus nicknames of everyone online. */
+    public void reapplyAll() {
+        display.refreshAll();
+        if (essentialsPlus == null) return;
+        for (PlayerRef playerRef : Universe.get().getPlayers()) {
+            if (storage.hasNickname(playerRef.getUuid())) {
+                syncOnJoin(playerRef);
+            }
+        }
     }
 
     private static void error(@Nonnull PlayerRef playerRef, @Nonnull String text) {

@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.events.AddWorldEvent;
 import com.nickname.plugin.api.NicknameAPI;
 import com.nickname.plugin.commands.NickCommand;
 import com.hypixel.hytale.common.plugin.PluginIdentifier;
+import com.nickname.plugin.compat.EssentialsPlusCompat;
 import com.nickname.plugin.compat.HyperPermsCompat;
 import com.nickname.plugin.compat.NicknamePlaceholders;
 import com.nickname.plugin.config.ConfigMigration;
@@ -78,10 +79,16 @@ public class NicknameChanger extends JavaPlugin {
         NicknameAPI.init(storage);
         this.display = new NicknameDisplay(storage, config);
 
-        ChatListener chatListener = new ChatListener(storage, config);
-        PlayerListener playerListener = new PlayerListener(storage, config, display);
+        EssentialsPlusCompat essentialsPlus = EssentialsPlusCompat.create(storage);
+        NicknameService service = new NicknameService(storage, config, display, essentialsPlus);
+        ChatListener chatListener = new ChatListener(storage, config, essentialsPlus);
+        PlayerListener playerListener = new PlayerListener(storage, config, display, service);
 
-        getCommandRegistry().registerCommand(new NickCommand(storage, config, display, new NicknameService(storage, config, display)));
+        getCommandRegistry().registerCommand(new NickCommand(storage, config, service));
+        if (essentialsPlus != null) {
+            // FIRST: message color for EssentialsPlus, which formats chat in its own NORMAL handler
+            getEventRegistry().registerGlobal(EventPriority.FIRST, PlayerChatEvent.class, chatListener::onPlayerChatEarly);
+        }
         // LAST: only format chat that no other plugin has taken over
         getEventRegistry().registerGlobal(EventPriority.LAST, PlayerChatEvent.class, chatListener::onPlayerChat);
         getEventRegistry().register(PlayerConnectEvent.class, playerListener::onPlayerConnect);
@@ -112,7 +119,7 @@ public class NicknameChanger extends JavaPlugin {
     /** Chat plugins that format chat themselves need NNC's placeholders in their own format. */
     private void logChatPluginHints() {
         for (PluginIdentifier chatPlugin : new PluginIdentifier[]{
-                PluginDetector.MINI_CHAT_FORMATTER, PluginDetector.ESSENTIALS_PLUS, PluginDetector.ELITE_ESSENTIALS}) {
+                PluginDetector.MINI_CHAT_FORMATTER, PluginDetector.ELITE_ESSENTIALS}) {
             if (!PluginDetector.isLoaded(chatPlugin)) continue;
             if (PlaceholderApiHook.isAvailable()) {
                 getLogger().at(Level.INFO).log("%s formats chat: put %%nnc_nickname_mini%% (or %%nnc_nickname_legacy%%) "

@@ -18,6 +18,7 @@ error.invalidCharacters = The nickname contains characters that are not allowed.
 error.realUsername = This is the name of another player.
 error.notSaved = Could not save the change, please tell an admin (see the server log).
 error.rulesInvalid = Nicknames are disabled: the nickname rules in config.json are invalid. Please tell an admin.
+error.essentialsPlus = EssentialsPlus chat can't show this nickname ({reason}).
 
 # Current nickname info
 current.nickname = Your current nickname:

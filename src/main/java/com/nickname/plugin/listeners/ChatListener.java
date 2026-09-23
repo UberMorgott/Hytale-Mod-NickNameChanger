@@ -7,6 +7,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.chat.ChatFormatParser;
 import com.nickname.plugin.commands.NickCommand;
+import com.nickname.plugin.compat.EssentialsPlusCompat;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.hooks.PlaceholderApiHook;
@@ -14,8 +15,12 @@ import com.nickname.plugin.util.MessageUtil;
 import com.nickname.plugin.storage.NicknameStorage;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
@@ -27,24 +32,52 @@ public class ChatListener {
     private final PluginConfig config;
     private final ChatFormatParser formatParser;
     private final Set<String> reportedFormatters = ConcurrentHashMap.newKeySet();
+    @Nullable
+    private final EssentialsPlusCompat essentialsPlus;
+    /** Chat text before EssentialsPlus color tags were added, to undo it if EP didn't take the message. */
+    private final Map<PlayerChatEvent, String> uncoloredContent = Collections.synchronizedMap(new WeakHashMap<>());
 
-    public ChatListener(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config) {
+    public ChatListener(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config,
+                        @Nullable EssentialsPlusCompat essentialsPlus) {
         this.storage = storage;
         this.config = config;
         this.formatParser = new ChatFormatParser(config.chatFormat);
+        this.essentialsPlus = essentialsPlus;
     }
 
+    /**
+     * FIRST priority, only with EssentialsPlus formatting chat: EP renders color tags in the chat
+     * text, so the player's message color is added around it (EP parses players' text as markup anyway).
+     */
+    public void onPlayerChatEarly(@Nonnull PlayerChatEvent event) {
+        if (event.isCancelled() || essentialsPlus == null || !essentialsPlus.isChatEnabled()) return;
+        String color = messageColor(event.getSender().getUuid());
+        if (color != null) {
+            uncoloredContent.put(event, event.getContent());
+            event.setContent(EssentialsPlusCompat.colorMessage(event.getContent(), color));
+        }
+    }
+
+    /** The stored message color, ignored once nickname.msgcolor is revoked. */
+    @Nullable
+    private String messageColor(@Nonnull UUID uuid) {
+        return PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_MSGCOLOR, true)
+            ? storage.getMessageColor(uuid) : null;
+    }
     /**
      * LAST priority: format the message only if no other plugin owns chat.
      * <p>
      * Chat plugins either cancel the event and send their own messages (EssentialsPlus,
      * EliteEssentials, Werchat) or install their own formatter (mini-chat-formatter, HyperPerms,
      * old LuckPerms, KyuubiSoft). Both are left untouched: those plugins show nicknames through
-     * NNC's PlaceholderAPI placeholders instead. The player's username is never modified.
+     * NNC's adapters or placeholders instead. The player's username is never modified.
      */
     public void onPlayerChat(@Nonnull PlayerChatEvent event) {
+        String uncolored = uncoloredContent.remove(event);
         if (event.isCancelled()) return;
-
+        if (uncolored != null) {
+            event.setContent(uncolored); // EssentialsPlus did not send it (e.g. muted); show the plain text
+        }
         PlayerChatEvent.Formatter current = event.getFormatter();
         if (current != PlayerChatEvent.DEFAULT_FORMATTER) {
             if (reportedFormatters.add(current.getClass().getName())) {
@@ -66,9 +99,7 @@ public class ChatListener {
 
         boolean hasLpData = (prefix != null && !prefix.isEmpty())
                 || (suffix != null && !suffix.isEmpty());
-        // A stored color is ignored once nickname.msgcolor is revoked
-        final String msgColor = PermissionsModule.get().hasPermission(senderUuid, NickCommand.PERM_MSGCOLOR, true)
-                ? storage.getMessageColor(senderUuid) : null;
+        final String msgColor = messageColor(senderUuid);
         boolean hasMsgColor = msgColor != null;
 
         // External placeholders (e.g. %ks_title_raw%, %mystictags_tag%) can be in the format itself

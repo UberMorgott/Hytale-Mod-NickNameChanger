@@ -14,7 +14,8 @@
   "OptionalDependencies": {
     "LuckPerms:LuckPerms": "*",
     "HelpChat:PlaceholderAPI": "*",
-    "com.hyperperms:HyperPerms": "*"
+    "com.hyperperms:HyperPerms": "*",
+    "fof1092:EssentialsPlus": "*"
   },
   "DisabledByDefault": false,
   "IncludesAssetPack": true
