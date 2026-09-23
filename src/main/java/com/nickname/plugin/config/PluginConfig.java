@@ -18,7 +18,7 @@ public class PluginConfig {
             .build();
 
     public String pluginName = "NicknameChanger";
-    public String version = "0.0.15";
+    public String version = "0.0.18";
     public boolean debugMode = false;
     public String chatFormat = "{prefix}<{username}>{suffix} {message}";
     public DisplayConfig display = new DisplayConfig();
@@ -35,10 +35,11 @@ public class PluginConfig {
                 .append(new KeyedCodec<>("ShowOnMap", Codec.BOOLEAN), (o, v) -> o.showOnMap = v, o -> o.showOnMap).add()
                 .build();
 
-        public boolean showInChat = true;
-        public boolean showOnNameplate = true;
-        public boolean showInTabList = true;
-        public boolean showOnMap = false;
+        // volatile: changed from the settings UI (world thread), read from chat and network threads
+        public volatile boolean showInChat = true;
+        public volatile boolean showOnNameplate = true;
+        public volatile boolean showInTabList = true;
+        public volatile boolean showOnMap = false;
     }
 
     public static class NicknameRules {
