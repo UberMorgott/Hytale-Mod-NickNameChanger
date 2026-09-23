@@ -111,13 +111,24 @@ public final class ConfigMigration {
             if (current == null) {
                 object.add(name.getValue(), legacy);
             } else if (current.isJsonObject() && legacy.isJsonObject()) {
-                for (Map.Entry<String, JsonElement> entry : legacy.getAsJsonObject().entrySet()) {
-                    if (!current.getAsJsonObject().has(entry.getKey())) {
-                        current.getAsJsonObject().add(entry.getKey(), entry.getValue());
-                    }
-                }
+                mergeMissing(current.getAsJsonObject(), legacy.getAsJsonObject());
             }
         }
         return changed;
+    }
+
+    /**
+     * Copies keys of {@code source} that {@code target} lacks, recursing into objects present on
+     * both sides; {@code target} wins where both have a value. Nested legacy keys are renamed afterwards.
+     */
+    private static void mergeMissing(JsonObject target, JsonObject source) {
+        for (Map.Entry<String, JsonElement> entry : source.entrySet()) {
+            JsonElement existing = target.get(entry.getKey());
+            if (existing == null) {
+                target.add(entry.getKey(), entry.getValue());
+            } else if (existing.isJsonObject() && entry.getValue().isJsonObject()) {
+                mergeMissing(existing.getAsJsonObject(), entry.getValue().getAsJsonObject());
+            }
+        }
     }
 }

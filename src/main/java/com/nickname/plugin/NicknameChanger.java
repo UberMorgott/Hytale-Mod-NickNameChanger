@@ -53,14 +53,15 @@ public class NicknameChanger extends JavaPlugin {
 
     @Override
     public CompletableFuture<Void> preLoad() {
-        // Must run before the config is loaded: the codec silently drops legacy camelCase keys
+        // Must run before the config is loaded: the codec silently ignores legacy camelCase keys,
+        // so loading an unmigrated file would silently fall back to defaults. Fail loading instead
+        // (the server reports the plugin error); the file and any backup stay untouched.
         try {
             if (ConfigMigration.migrate(getDataDirectory().resolve("config.json"))) {
                 getLogger().at(Level.INFO).log("Migrated config.json to the current key format (backup: config.json.pre-0.0.18.bak).");
             }
         } catch (IOException | RuntimeException e) {
-            // Leave the file as it is; the regular config loader reports what is wrong with it
-            getLogger().at(Level.SEVERE).withCause(e).log("Could not migrate config.json");
+            throw new IllegalStateException("Could not migrate config.json; fix or remove it and restart", e);
         }
         return super.preLoad();
     }
@@ -69,9 +70,9 @@ public class NicknameChanger extends JavaPlugin {
     protected void setup() {
         this.dataFolder = getDataDirectory();
         this.config = configHolder.get();
-        // Rewrite the file so it always lists every current option with its effective value
+        // Rewrite the (migrated) file so it lists every current option with its effective value
         config.version = getManifest().getVersion().toString();
-        configHolder.save();
+        configHolder.save().join();
 
         this.storage = new NicknameStorage(dataFolder, config);
         NicknameAPI.init(storage);

@@ -55,6 +55,27 @@ class ConfigMigrationTest {
     }
 
     @Test
+    void nestedMixedObjectsKeepLegacyOnlyLeaves() throws Exception {
+        JsonObject root = migrate("""
+            {"integrations": {"luckperms": {"showPrefix": false, "enabled": true}},
+             "Integrations": {"luckperms": {"enabled": false}}}
+            """);
+        JsonObject lp = root.getAsJsonObject("Integrations").getAsJsonObject("Luckperms");
+        assertFalse(lp.get("ShowPrefix").getAsBoolean());
+        assertFalse(lp.get("Enabled").getAsBoolean(), "the current spelling wins at the same leaf");
+        assertEquals(2, lp.size());
+        assertEquals(1, root.getAsJsonObject("Integrations").size());
+    }
+
+    @Test
+    void unreadableFileFailsAndStaysUntouched() throws Exception {
+        Path file = dir.resolve("config.json");
+        Files.writeString(file, "{\"chatFormat\": ", StandardCharsets.UTF_8);
+        assertThrows(RuntimeException.class, () -> ConfigMigration.migrate(file));
+        assertEquals("{\"chatFormat\": ", Files.readString(file, StandardCharsets.UTF_8));
+    }
+
+    @Test
     void currentFileIsNotRewritten() throws Exception {
         Path file = dir.resolve("config.json");
         Files.writeString(file, "{\"ChatFormat\": \"x\"}", StandardCharsets.UTF_8);
