@@ -172,6 +172,10 @@ public final class NicknameService {
         mirrors.add(mirror);
     }
 
+    public boolean hasMirrors() {
+        return !mirrors.isEmpty();
+    }
+
     /** Chat plugins with their own nickname store show that one; keep it equal to ours and say so if they refuse. */
     private void syncMirrors(@Nonnull PlayerRef playerRef) {
         for (NicknameMirror mirror : mirrors) {

@@ -7,6 +7,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.display.NicknameDisplay;
@@ -50,6 +51,26 @@ public class PlayerListener {
     }
 
     /**
+     * LAST priority, every ready event: sync the nickname into chat plugins with their own
+     * nickname store. EliteEssentials creates its player data in a task it queues from its own
+     * ready handler, so the sync is queued on the same world after it (world tasks run in order).
+     */
+    public void onPlayerReadyLate(@Nonnull PlayerReadyEvent event) {
+        if (!service.hasMirrors()) return;
+        Ref<EntityStore> ref = event.getPlayerRef();
+        if (ref == null || !ref.isValid()) return;
+        Store<EntityStore> store = ref.getStore();
+        World world = store.getExternalData().getWorld();
+        world.execute(() -> {
+            if (!ref.isValid()) return;
+            PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
+            if (playerRef != null) {
+                service.syncOnJoin(playerRef);
+            }
+        });
+    }
+
+    /**
      * Fires on the world thread every time the client finishes loading a world (join, portal,
      * instance). The server resets the nameplate on each world add, so it is re-applied here;
      * the tab list is renamed by {@link NicknameDisplay} as the server sends it.
@@ -71,7 +92,6 @@ public class PlayerListener {
 
         // Once per login, not on every world change
         if (event.getReadyId() == 0) {
-            service.syncOnJoin(playerRef);
             playerRef.sendMessage(Message.join(
                 Message.raw(Messages.get(playerRef, Messages.WELCOME_NICKNAME) + " ").color("#55FF55"),
                 MessageUtil.parse(nickname)

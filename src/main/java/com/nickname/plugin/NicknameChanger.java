@@ -91,6 +91,7 @@ public class NicknameChanger extends JavaPlugin {
         getEventRegistry().registerGlobal(EventPriority.LAST, PlayerChatEvent.class, chatListener::onPlayerChat);
         getEventRegistry().register(PlayerConnectEvent.class, playerListener::onPlayerConnect);
         getEventRegistry().registerGlobal(PlayerReadyEvent.class, playerListener::onPlayerReady);
+        getEventRegistry().registerGlobal(EventPriority.LAST, PlayerReadyEvent.class, playerListener::onPlayerReadyLate);
         getEventRegistry().registerGlobal(AddWorldEvent.class, display::onAddWorld);
     }
 
