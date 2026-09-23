@@ -1,7 +1,6 @@
 package com.nickname.plugin.util;
 
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.protocol.MaybeBool;
 
 import javax.annotation.Nonnull;
 import java.util.regex.Matcher;
@@ -132,7 +131,7 @@ public final class MessageUtil {
         if (bold) msg.bold(true);
         if (italic) msg.italic(true);
         if (color != null) msg.color(color);
-        if (underline) msg.getFormattedMessage().underlined = MaybeBool.True;
+        if (underline) msg.getFormattedMessage().underlined = Boolean.TRUE;
         return msg;
     }
 
@@ -153,7 +152,7 @@ public final class MessageUtil {
             if (bold) ch.bold(true);
             if (italic) ch.italic(true);
             ch.color(hex);
-            if (underline) ch.getFormattedMessage().underlined = MaybeBool.True;
+            if (underline) ch.getFormattedMessage().underlined = Boolean.TRUE;
             result = result.insert(ch);
         }
         return result;

@@ -93,12 +93,7 @@ public class PlayerListener {
         Universe.get().broadcastPacket(removePacket);
 
         // Add player back with new display name
-        ServerPlayerListPlayer playerListEntry = new ServerPlayerListPlayer(
-            uuid,
-            plainName,
-            worldUuid,
-            0  // ping will be updated by the ping system
-        );
+        ServerPlayerListPlayer playerListEntry = PlayerRefUtil.tabListEntry(playerRef, plainName);
         AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{playerListEntry});
         Universe.get().broadcastPacket(addPacket);
     }

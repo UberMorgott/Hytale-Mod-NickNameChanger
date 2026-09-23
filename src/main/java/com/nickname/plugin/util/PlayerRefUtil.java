@@ -1,5 +1,10 @@
 package com.nickname.plugin.util;
 
+import com.hypixel.hytale.protocol.packets.interface_.ServerPlayerListPlayer;
+import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.HytaleServerConfig;
+import com.hypixel.hytale.server.core.modules.entity.component.PlayerLives;
+import com.hypixel.hytale.server.core.modules.entity.component.Spectating;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 import javax.annotation.Nonnull;
@@ -43,5 +48,18 @@ public class PlayerRefUtil {
         } catch (Exception e) {
             LOGGER.at(Level.SEVERE).withCause(e).log("Failed to set PlayerRef username");
         }
+    }
+
+    /** Tab list entry with a custom name; other fields mirror ServerPlayerListModule.createServerPlayerListPlayer. */
+    @Nonnull
+    public static ServerPlayerListPlayer tabListEntry(@Nonnull PlayerRef playerRef, @Nonnull String name) {
+        boolean spectating = playerRef.getComponentConcurrent(Spectating.getComponentType()) != null;
+        Integer lives = null;
+        HytaleServerConfig.Defaults defaults = HytaleServer.get().getConfig().getDefaults();
+        if (defaults.getHardcoreMode().showsPersonalLives(defaults.getHardcoreLives())) {
+            PlayerLives livesComponent = playerRef.getComponentConcurrent(PlayerLives.getComponentType());
+            lives = Math.max(livesComponent != null ? livesComponent.getRemaining() : defaults.getHardcoreLives(), 0);
+        }
+        return new ServerPlayerListPlayer(playerRef.getUuid(), name, playerRef.getWorldUuid(), 0, spectating, lives);
     }
 }

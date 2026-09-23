@@ -30,7 +30,7 @@ import com.nickname.plugin.util.MessageUtil;
 import com.nickname.plugin.util.PlayerRefUtil;
 
 import javax.annotation.Nonnull;
-import java.util.List;
+import java.util.Collection;
 import java.util.UUID;
 
 public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettingsPage.EventData> {
@@ -105,7 +105,7 @@ public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettin
     }
 
     private void applyToAllPlayers() {
-        List<PlayerRef> players = Universe.get().getPlayers();
+        Collection<PlayerRef> players = Universe.get().getPlayers();
 
         for (PlayerRef pr : players) {
             UUID uuid = pr.getUuid();
@@ -147,7 +147,7 @@ public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettin
             Universe.get().broadcastPacket(removePacket);
 
             String tabName = showInTabList ? plainName : originalName;
-            ServerPlayerListPlayer entry = new ServerPlayerListPlayer(uuid, tabName, pr.getWorldUuid(), 0);
+            ServerPlayerListPlayer entry = PlayerRefUtil.tabListEntry(pr, tabName);
             AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{entry});
             Universe.get().broadcastPacket(addPacket);
 

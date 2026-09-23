@@ -578,7 +578,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
             UUID worldUuid = playerRef.getWorldUuid();
             RemoveFromServerPlayerList removePacket = new RemoveFromServerPlayerList(new UUID[]{uuid});
             Universe.get().broadcastPacket(removePacket);
-            ServerPlayerListPlayer playerListEntry = new ServerPlayerListPlayer(uuid, plainName, worldUuid, 0);
+            ServerPlayerListPlayer playerListEntry = PlayerRefUtil.tabListEntry(playerRef, plainName);
             AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{playerListEntry});
             Universe.get().broadcastPacket(addPacket);
         }
@@ -637,7 +637,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
         UUID worldUuid = playerRef.getWorldUuid();
         RemoveFromServerPlayerList removePacket = new RemoveFromServerPlayerList(new UUID[]{uuid});
         Universe.get().broadcastPacket(removePacket);
-        ServerPlayerListPlayer playerListEntry = new ServerPlayerListPlayer(uuid, originalName, worldUuid, 0);
+        ServerPlayerListPlayer playerListEntry = PlayerRefUtil.tabListEntry(playerRef, originalName);
         AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{playerListEntry});
         Universe.get().broadcastPacket(addPacket);
 

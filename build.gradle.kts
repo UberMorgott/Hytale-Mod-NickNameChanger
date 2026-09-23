@@ -8,12 +8,13 @@ version = "0.0.17"
 
 repositories {
     mavenCentral()
+    maven("https://maven.hytale.com/release")
 }
 
 dependencies {
-    compileOnly(files("../../../Hytale/install/release/package/game/latest/Server/HytaleServer.jar"))
-    compileOnly(files("libs/LuckPerms-Hytale-5.5.26.jar"))
-    compileOnly(files("libs/tinymessage-2.0.0.jar"))
+    compileOnly("com.hypixel.hytale:Server:0.6.8")
+    // LuckPerms-Hytale ships the standard LuckPerms API (net.luckperms.api)
+    compileOnly("net.luckperms:api:5.4")
     implementation("com.google.code.gson:gson:2.10.1")
 }
 
@@ -40,7 +41,8 @@ tasks {
 }
 
 java {
+    // Server 0.6.8 classes are Java 25 bytecode (major 69); compile with JDK 25, emit Java 21 bytecode
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
