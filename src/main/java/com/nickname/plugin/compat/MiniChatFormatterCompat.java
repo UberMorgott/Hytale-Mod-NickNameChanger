@@ -22,10 +22,10 @@ import java.util.regex.Pattern;
 
 /**
  * mini-chat-formatter (lucko, 0.1.x) renders {@code <username>} from the real username at format
- * time. This adapter runs at LATE (after MCF installs its formatter, before MCF's LAST check) and
+ * time and knows nothing of NNC message colors. This adapter runs at LATE (after MCF installs its formatter, before MCF's LAST check) and
  * swaps in another {@code MiniChatFormatter} whose format uses {@code <nnc_username>} instead:
  * built with MCF's public constructor, the same LuckPerms / PlaceholderAPI resolvers MCF installs,
- * plus a resolver for the NNC nickname. MCF keeps owning the chat (relational formats, delivery).
+ * plus resolvers for the NNC nickname and the player's message color around {@code <message>}. MCF keeps owning the chat (relational formats, delivery).
  * One adapted formatter is cached per MCF formatter, so /mcf reload is picked up.
  * <p>
  * Uses reflection against MCF's public classes (verified on 0.1.0-beta7), so nothing of MCF is
@@ -37,8 +37,11 @@ public final class MiniChatFormatterCompat {
     private static final String BASE = "me.lucko.minichatformatter.";
     private static final String KYORI = BASE + "lib.kyori.adventure.text.minimessage.";
     private static final String TAG = "nnc_username";
-    /** The {@code <username>} tag, not an escaped {@code \<username>}. */
+    private static final String COLOR_OPEN = "nnc_msgcolor_open";
+    private static final String COLOR_CLOSE = "nnc_msgcolor_close";
+    /** The {@code <username>} / {@code <message>} tags, not escaped ones like {@code \<username>}. */
     private static final Pattern USERNAME_TAG = Pattern.compile("(?<!\\\\)<username>");
+    private static final Pattern MESSAGE_TAG = Pattern.compile("(?<!\\\\)<message>");
 
     private final NicknamePlaceholders placeholders;
     private final Class<?> formatterClass;
@@ -56,6 +59,7 @@ public final class MiniChatFormatterCompat {
     private final Constructor<?> luckPermsResolver;
     private final Constructor<?> placeholderApiResolver;
     private final Method parseFormattedText;
+    private final Method preProcessParsed;
     private final Method contextTarget;
     private final Method chatSender;
     private final Object nicknameResolver;
@@ -76,12 +80,13 @@ public final class MiniChatFormatterCompat {
         this.luckPermsResolver = Class.forName(BASE + "hook.luckperms.LuckPermsTagResolver").getConstructors()[0];
         this.placeholderApiResolver = Class.forName(BASE + "hook.placeholderapi.PlaceholderApiTagResolver").getConstructors()[0];
         this.parseFormattedText = Class.forName(BASE + "format.FormatUtil").getMethod("parseFormattedText", String.class);
+        this.preProcessParsed = Class.forName(KYORI + "tag.Tag").getMethod("preProcessParsed", String.class);
         this.contextTarget = Class.forName(KYORI + "Context").getMethod("target");
         this.chatSender = Class.forName(BASE + "context.ChatContext").getMethod("sender");
 
         this.nicknameResolver = proxy(tagResolverClass, (proxy, method, args) -> switch (method.getName()) {
-            case "has" -> TAG.equals(args[0]);
-            case "resolve" -> args.length == 3 && TAG.equals(args[0]) ? nicknameTag(args[2]) : null;
+            case "has" -> TAG.equals(args[0]) || COLOR_OPEN.equals(args[0]) || COLOR_CLOSE.equals(args[0]);
+            case "resolve" -> args.length == 3 ? resolveTag((String) args[0], args[2]) : null;
             default -> objectMethod(proxy, method, args);
         });
         this.configFunction = proxy(configFunctionClass, (proxy, method, args) -> {
@@ -129,8 +134,11 @@ public final class MiniChatFormatterCompat {
     private PlayerChatEvent.Formatter adapt(PlayerChatEvent.Formatter original) {
         try {
             String format = (String) getFormat.invoke(original);
-            if (!USERNAME_TAG.matcher(format).find()) return original;
+            boolean adaptedAlready = format.contains("<" + TAG + ">") || format.contains("<" + COLOR_OPEN + ">");
+            if (adaptedAlready || (!USERNAME_TAG.matcher(format).find() && !MESSAGE_TAG.matcher(format).find())) return original;
             String nicknameFormat = USERNAME_TAG.matcher(format).replaceAll("<" + TAG + ">");
+            // The player's message color around the (unparsed) message text
+            nicknameFormat = MESSAGE_TAG.matcher(nicknameFormat).replaceAll("<" + COLOR_OPEN + "><message><" + COLOR_CLOSE + ">");
             return (PlayerChatEvent.Formatter) formatterConstructor.newInstance(nicknameFormat, LOGGER, configFunction);
         } catch (ReflectiveOperationException | RuntimeException e) {
             LOGGER.at(Level.WARNING).withCause(e).log("Could not adapt the mini-chat-formatter format; it shows real names.");
@@ -151,20 +159,27 @@ public final class MiniChatFormatterCompat {
         builderResolver.invoke(builder, nicknameResolver);
     }
 
-    /** {@code <nnc_username>}: nickname (or real name, escaped) in MiniMessage, parsed the way MCF parses prefixes. */
+    /**
+     * {@code <nnc_username>}: nickname (or real name, escaped) in MiniMessage, parsed the way MCF parses prefixes.
+     * {@code <nnc_msgcolor_open>} / {@code <nnc_msgcolor_close>}: the player's message color tags, inserted
+     * before parsing so they enclose the message (empty without a color or nickname.msgcolor).
+     */
     @Nullable
-    private Object nicknameTag(Object parseContext) {
+    private Object resolveTag(String name, Object parseContext) {
         try {
+            if (!TAG.equals(name) && !COLOR_OPEN.equals(name) && !COLOR_CLOSE.equals(name)) return null;
             PlayerRef sender = (PlayerRef) chatSender.invoke(contextTarget.invoke(parseContext));
-            String value = placeholders.resolve(sender.getUuid(), sender.getUsername(), "nickname_mini");
-            return parseFormattedText.invoke(null, value);
+            if (TAG.equals(name)) {
+                return parseFormattedText.invoke(null, placeholders.resolve(sender.getUuid(), sender.getUsername(), "nickname_mini"));
+            }
+            String placeholder = COLOR_OPEN.equals(name) ? "msgcolor_open" : "msgcolor_close";
+            return preProcessParsed.invoke(null, placeholders.resolve(sender.getUuid(), sender.getUsername(), placeholder));
         } catch (ReflectiveOperationException | RuntimeException e) {
             // Unresolved tag instead of failing the whole chat message
-            LOGGER.at(Level.WARNING).withCause(e).log("Could not resolve <%s>", TAG);
+            LOGGER.at(Level.WARNING).withCause(e).log("Could not resolve <%s>", name);
             return null;
         }
     }
-
     private static Object proxy(Class<?> type, InvocationHandler handler) {
         return Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, handler);
     }
