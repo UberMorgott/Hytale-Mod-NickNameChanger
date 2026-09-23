@@ -4,9 +4,12 @@ import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.util.MessageUtil;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.logging.Level;
@@ -25,6 +28,7 @@ public class NicknameStorage {
     private final Map<UUID, String> nicknames = new HashMap<>();
     private final Map<UUID, String> originalUsernames = new HashMap<>();
     private final Map<UUID, String> messageColors = new HashMap<>();
+    private final Set<Path> unwritableFiles = new HashSet<>();
     private final Path storageFile;
     private final Path originalsFile;
     private final Path messageColorsFile;
@@ -133,27 +137,43 @@ public class NicknameStorage {
         loadMap(originalsFile, originalUsernames);
     }
 
+    /**
+     * Loads a UUID-to-string map. A file that cannot be read completely (bad JSON, bad encoding,
+     * invalid UUID keys) is never overwritten: it is marked unwritable so the data stays on disk
+     * for manual repair instead of being replaced by a partial map on the next save.
+     */
     private void loadMap(Path file, Map<UUID, String> target) {
         if (!Files.exists(file)) return;
-        try (Reader reader = Files.newBufferedReader(file)) {
+        try {
+            String json = Files.readString(file, StandardCharsets.UTF_8);
+            if (json.startsWith("﻿")) {
+                json = json.substring(1); // UTF-8 BOM written by some editors (e.g. Notepad)
+            }
             Type type = new TypeToken<Map<String, String>>(){}.getType();
-            Map<String, String> loaded = GSON.fromJson(reader, type);
+            Map<String, String> loaded = GSON.fromJson(json, type);
+            Map<UUID, String> parsed = new HashMap<>();
             if (loaded != null) {
                 for (Map.Entry<String, String> entry : loaded.entrySet()) {
-                    try {
-                        target.put(UUID.fromString(entry.getKey()), entry.getValue());
-                    } catch (IllegalArgumentException ignored) {}
+                    if (entry.getValue() == null) {
+                        throw new IllegalArgumentException("null value for key " + entry.getKey());
+                    }
+                    parsed.put(UUID.fromString(entry.getKey()), entry.getValue());
                 }
             }
-        } catch (IOException e) {
-            LOGGER.at(Level.SEVERE).withCause(e).log("Failed to load %s", file.getFileName());
+            target.putAll(parsed);
         } catch (Exception e) {
-            LOGGER.at(Level.SEVERE).withCause(e).log("Corrupted data in %s", file.getFileName());
-            // Don't crash — start with empty data, file will be overwritten on next save
+            unwritableFiles.add(file);
+            LOGGER.at(Level.SEVERE).withCause(e).log(
+                "Could not read %s. The file is left untouched and will NOT be saved until it is fixed and the server restarted.",
+                file.toAbsolutePath());
         }
     }
 
     private synchronized void saveMap(Path file, Map<UUID, String> source) {
+        if (unwritableFiles.contains(file)) {
+            LOGGER.at(Level.SEVERE).log("Not saving %s: it failed to load at startup (see earlier error).", file.getFileName());
+            return;
+        }
         try {
             Files.createDirectories(file.getParent());
             Map<String, String> toSave = new HashMap<>();
@@ -161,7 +181,7 @@ public class NicknameStorage {
                 toSave.put(entry.getKey().toString(), entry.getValue());
             }
             Path tmpFile = file.resolveSibling(file.getFileName() + ".tmp");
-            try (Writer writer = Files.newBufferedWriter(tmpFile)) {
+            try (Writer writer = Files.newBufferedWriter(tmpFile, StandardCharsets.UTF_8)) {
                 GSON.toJson(toSave, writer);
             }
             try {
