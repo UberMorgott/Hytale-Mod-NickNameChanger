@@ -35,11 +35,12 @@ public class NicknameStorage {
 
     private static final HytaleLogger LOGGER = HytaleLogger.get("NicknameChanger");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON_COMPACT = new GsonBuilder().serializeNulls().create();
     private final Map<UUID, String> nicknames = new HashMap<>();
     private final Map<UUID, String> originalUsernames = new HashMap<>();
     private final Map<UUID, String> messageColors = new HashMap<>();
-    /** Per chat plugin: the nicknames players had there before NNC synced theirs (restored later). */
-    private final Map<String, Map<UUID, String>> replacedNicknames = new HashMap<>();
+    /** Per chat plugin: {@link MirrorRecord} per player, as JSON strings. */
+    private final Map<String, Map<UUID, String>> mirrorRecords = new HashMap<>();
     private final Path dataFolder;
     private final Set<Path> unwritableFiles = new HashSet<>();
     private final Path storageFile;
@@ -150,26 +151,52 @@ public class NicknameStorage {
         return setMessageColor(uuid, null);
     }
 
-    // --- Nicknames of other plugins replaced by NNC (file <plugin>-nicknames.json) ---
+    // --- Nicknames NNC mirrors into other plugins (file <plugin>-mirror.json) ---
 
-    public synchronized String getReplacedNickname(String plugin, UUID uuid) {
-        return replacedNicknames(plugin).get(uuid);
+    /**
+     * NNC's ownership of a player's nickname in another plugin.
+     *
+     * @param prior    the plugin's nickname before NNC took over ({@code null}: the player had none)
+     * @param mirrored the last nickname NNC successfully wrote there ({@code null}: none yet)
+     */
+    public record MirrorRecord(@Nullable String prior, @Nullable String mirrored) {}
+
+    @Nullable
+    public synchronized MirrorRecord getMirrorRecord(String plugin, UUID uuid) {
+        String json = mirrorRecords(plugin).get(uuid);
+        if (json == null) return null;
+        JsonObject object = JsonParser.parseString(json).getAsJsonObject();
+        return new MirrorRecord(optString(object, "prior"), optString(object, "mirrored"));
     }
 
-    public synchronized boolean setReplacedNickname(String plugin, UUID uuid, @Nullable String nickname) {
-        return update(replacedNicknames(plugin), replacedNicknamesFile(plugin), uuid, nickname);
+    /** Saves ({@code record != null}) or deletes the record; returns false if it could not be saved. */
+    public synchronized boolean setMirrorRecord(String plugin, UUID uuid, @Nullable MirrorRecord record) {
+        String json = null;
+        if (record != null) {
+            JsonObject object = new JsonObject();
+            object.addProperty("prior", record.prior());
+            object.addProperty("mirrored", record.mirrored());
+            json = GSON_COMPACT.toJson(object);
+        }
+        return update(mirrorRecords(plugin), mirrorFile(plugin), uuid, json);
     }
 
-    private Map<UUID, String> replacedNicknames(String plugin) {
-        return replacedNicknames.computeIfAbsent(plugin, key -> {
+    @Nullable
+    private static String optString(JsonObject object, String key) {
+        JsonElement value = object.get(key);
+        return value == null || value.isJsonNull() ? null : value.getAsString();
+    }
+
+    private Map<UUID, String> mirrorRecords(String plugin) {
+        return mirrorRecords.computeIfAbsent(plugin, key -> {
             Map<UUID, String> map = new HashMap<>();
-            loadMap(replacedNicknamesFile(key), map);
+            loadMap(mirrorFile(key), map);
             return map;
         });
     }
 
-    private Path replacedNicknamesFile(String plugin) {
-        return dataFolder.resolve(plugin + "-nicknames.json");
+    private Path mirrorFile(String plugin) {
+        return dataFolder.resolve(plugin + "-mirror.json");
     }
     // --- Global display settings (read from config) ---
 

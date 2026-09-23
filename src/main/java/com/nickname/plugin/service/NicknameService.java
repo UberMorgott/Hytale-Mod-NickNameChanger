@@ -65,7 +65,6 @@ public final class NicknameService {
             return false;
         }
 
-        String previous = storage.getNickname(uuid);
         NicknameStorage.ClaimResult claim = storage.claimNickname(uuid, result.nickname(), result.plain(),
             config.nicknames.uniqueNicknames, config.nicknames.blockRealUsernames);
         String claimError = switch (claim) {
@@ -85,7 +84,7 @@ public final class NicknameService {
             Message.raw(Messages.get(playerRef, Messages.SET_SUCCESS) + " ").color("#55FF55"),
             MessageUtil.parse(result.nickname())
         ));
-        syncMirrors(playerRef, previous);
+        syncMirrors(playerRef);
         return true;
     }
 
@@ -97,7 +96,6 @@ public final class NicknameService {
             return;
         }
 
-        String previous = storage.getNickname(uuid);
         if (!storage.removeNickname(uuid)) {
             error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
             return;
@@ -108,7 +106,7 @@ public final class NicknameService {
             Message.raw(Messages.get(playerRef, Messages.RESET_SUCCESS) + " ").color("#55FF55"),
             Message.raw(playerRef.getUsername()).color("#FFFFFF")
         ));
-        syncMirrors(playerRef, previous);
+        syncMirrors(playerRef);
         if (!storage.removeMessageColor(uuid)) {
             error(playerRef, Messages.get(playerRef, Messages.ERROR_NOT_SAVED));
         }
@@ -175,9 +173,9 @@ public final class NicknameService {
     }
 
     /** Chat plugins with their own nickname store show that one; keep it equal to ours and say so if they refuse. */
-    private void syncMirrors(@Nonnull PlayerRef playerRef, @Nullable String previousNickname) {
+    private void syncMirrors(@Nonnull PlayerRef playerRef) {
         for (NicknameMirror mirror : mirrors) {
-            String refusal = mirror.sync(playerRef.getUuid(), previousNickname);
+            String refusal = mirror.sync(playerRef.getUuid());
             if (refusal != null) {
                 error(playerRef, Messages.get(playerRef, Messages.ERROR_CHAT_PLUGIN, "plugin", mirror.name(), "reason", refusal));
             }
@@ -187,7 +185,7 @@ public final class NicknameService {
     /** On join (the chat plugins have loaded the player by PlayerReady): sync their nicknames. Refusals are logged. */
     public void syncOnJoin(@Nonnull PlayerRef playerRef) {
         for (NicknameMirror mirror : mirrors) {
-            String refusal = mirror.sync(playerRef.getUuid(), null);
+            String refusal = mirror.sync(playerRef.getUuid());
             if (refusal != null) {
                 LOGGER.at(Level.INFO).log("%s chat can't show the nickname of %s: %s", mirror.name(), playerRef.getUsername(), refusal);
             }

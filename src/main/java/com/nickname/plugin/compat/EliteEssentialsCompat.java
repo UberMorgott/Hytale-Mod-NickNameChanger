@@ -71,8 +71,9 @@ public final class EliteEssentialsCompat extends NicknameMirror {
         return "SET".equals(String.valueOf(result)) ? null : String.valueOf(result);
     }
 
+    @Nullable
     @Override
-    protected void remove(@Nonnull UUID uuid) throws ReflectiveOperationException {
-        clearNick.invoke(nickService, uuid);
+    protected String remove(@Nonnull UUID uuid) throws ReflectiveOperationException {
+        return (boolean) clearNick.invoke(nickService, uuid) ? null : "PLAYER_NOT_FOUND";
     }
 }

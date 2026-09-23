@@ -95,9 +95,10 @@ public final class EssentialsPlusCompat extends NicknameMirror {
             ? null : Objects.requireNonNullElse((String) resultReason.invoke(result), "refused");
     }
 
+    @Nullable
     @Override
-    protected void remove(@Nonnull UUID uuid) throws ReflectiveOperationException {
-        removeNickname.invoke(getInstance.invoke(null), uuid);
+    protected String remove(@Nonnull UUID uuid) throws ReflectiveOperationException {
+        return (boolean) removeNickname.invoke(getInstance.invoke(null), uuid) ? null : "player not loaded";
     }
 
     /** EssentialsPlus markup wrapping the chat text in the player's message color. */
