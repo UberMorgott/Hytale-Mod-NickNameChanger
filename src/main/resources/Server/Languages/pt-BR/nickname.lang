@@ -83,4 +83,5 @@ ui.settings.showOnNameplate = Mostrar na Placa de Nome
 ui.settings.showInTabList = Mostrar na Lista / Mapa
 ui.settings.save = Salvar
 settings.saved = Configurações salvas!
+settings.saveFailed = Não foi possível salvar o config.json, veja o log do servidor.
 error.noSettingsPermission = Você precisa de permissão de administrador para alterar as configurações.

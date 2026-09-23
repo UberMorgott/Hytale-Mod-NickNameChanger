@@ -83,4 +83,5 @@ ui.settings.showOnNameplate = Показывать над головой
 ui.settings.showInTabList = Показывать в таб-листе / на карте
 ui.settings.save = Сохранить
 settings.saved = Настройки сохранены!
+settings.saveFailed = Не удалось сохранить config.json, подробности в логе сервера.
 error.noSettingsPermission = Для изменения настроек отображения нужны права администратора.

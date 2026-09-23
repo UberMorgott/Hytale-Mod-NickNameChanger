@@ -11,23 +11,15 @@ import com.hypixel.hytale.protocol.packets.interface_.Page;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
-import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.protocol.packets.interface_.AddToServerPlayerList;
-import com.hypixel.hytale.protocol.packets.interface_.RemoveFromServerPlayerList;
-import com.hypixel.hytale.protocol.packets.interface_.ServerPlayerListPlayer;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.commands.NickCommand;
-import com.nickname.plugin.config.PluginConfig;
-import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.util.MessageUtil;
-import com.nickname.plugin.util.PlayerRefUtil;
 import com.nickname.plugin.i18n.Messages;
+import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
 
 import javax.annotation.Nonnull;
@@ -36,7 +28,7 @@ import java.util.UUID;
 public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPage.EventData> {
 
     private final NicknameStorage storage;
-    private final PluginConfig config;
+    private final NicknameService service;
     private String currentNickname;
     private String currentColor = "";
     private boolean isBold = false;
@@ -49,10 +41,10 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
     private String gradColor2 = "#5555FF";
     private String msgColor = "";
 
-    public NicknameEditorPage(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config, @Nonnull PlayerRef playerRef) {
+    public NicknameEditorPage(@Nonnull NicknameStorage storage, @Nonnull NicknameService service, @Nonnull PlayerRef playerRef) {
         super(playerRef, CustomPageLifetime.CanDismissOrCloseThroughInteraction, EventData.CODEC);
         this.storage = storage;
-        this.config = config;
+        this.service = service;
 
         String existingNick = storage.getNickname(playerRef.getUuid());
         if (existingNick != null) {
@@ -299,7 +291,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
                     gradColor1 = "#FF5555";
                     gradColor2 = "#5555FF";
                     msgColor = "";
-                    resetNickname(ref, store);
+                    service.resetNickname(ref, store, playerRef);
                 }
                 case "cancel" -> {
                     playerComponent.getPageManager().setPage(ref, store, Page.None);
@@ -483,104 +475,20 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
         return !currentColor.isEmpty() || "gradient".equals(nickColorMode) || isBold || isItalic || isUnderline;
     }
 
-    private boolean isAllowedChar(char c) {
-        if (c == ' ' || c == '_' || c == '-' || c == '.' || c == '!' || c == '?') return true;
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) return true;
-        if (config.nicknames.allowCyrillic && Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC) return true;
-        if (config.nicknames.allowUnicode && Character.isLetterOrDigit(c)) return true;
-        return false;
-    }
-
-    private String filterPlainNickname(String nickname) {
-        StringBuilder filtered = new StringBuilder();
-        for (char c : nickname.toCharArray()) {
-            if (isAllowedChar(c)) {
-                filtered.append(c);
-            }
-        }
-        return filtered.toString().trim();
-    }
-
     private boolean applyNickname(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         UUID uuid = playerRef.getUuid();
-
-        // Filter nickname text
-        String filteredName = filterPlainNickname(currentNickname);
-        if (filteredName.isEmpty()) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_INVALID)).color("#FF5555"));
-            return false;
-        }
-
-        // Check length
-        int minLen = config.nicknames.minLength;
-        int maxLen = config.nicknames.maxLength;
-        if (filteredName.length() < minLen) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_MIN_LENGTH, "min", minLen)).color("#FF5555"));
-            return false;
-        }
-        if (filteredName.length() > maxLen) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_MAX_LENGTH, "max", maxLen)).color("#FF5555"));
-            return false;
-        }
-
-        // Check banned words
-        String lowerName = filteredName.toLowerCase();
-        for (String banned : config.nicknames.bannedWords) {
-            if (lowerName.contains(banned.toLowerCase())) {
-                playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_BANNED_WORD)).color("#FF5555"));
-                return false;
-            }
-        }
-
-        // Check uniqueness
-        if (config.nicknames.uniqueNicknames && storage.isNicknameTaken(filteredName, uuid)) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NICKNAME_TAKEN)).color("#FF5555"));
-            return false;
-        }
-
-        // Update currentNickname with filtered version
-        currentNickname = filteredName;
 
         // Strip formatting if player lacks nickname.format permission
         String formattedNickname;
         if (hasFormatting() && !PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_FORMAT, true)) {
-            formattedNickname = currentNickname;
+            formattedNickname = currentNickname.trim();
             playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_FORMAT_PERM)).color("#FF5555"));
         } else {
             formattedNickname = buildFormattedNickname();
         }
 
-        storage.setOriginalUsername(uuid, storage.getOriginalUsername(uuid) != null ? storage.getOriginalUsername(uuid) : playerRef.getUsername());
-        storage.setNickname(uuid, formattedNickname);
-
-        String plainName = MessageUtil.stripTags(formattedNickname);
-
-        // Update PlayerRef.username for map markers (breaks other plugins' player lookups)
-        if (config.display.showOnMap) {
-            PlayerRefUtil.setUsername(playerRef, plainName);
-        }
-
-        // Sync nickname to LuckPerms if available (for chat formatting compatibility)
-        if (LuckPermsHook.isAvailable()) {
-            LuckPermsHook.setDisplayName(uuid, formattedNickname);
-        }
-
-        if (storage.isShowOnNameplate()) {
-            Nameplate nameplate = store.ensureAndGetComponent(ref, Nameplate.getComponentType());
-            nameplate.setText(plainName);
-
-            // Plain text for DisplayNameComponent — nametag can't render per-char gradient Messages
-            DisplayNameComponent displayNameComponent = new DisplayNameComponent(Message.raw(plainName));
-            store.putComponent(ref, DisplayNameComponent.getComponentType(), displayNameComponent);
-        }
-
-        if (storage.isShowInTabList()) {
-            UUID worldUuid = playerRef.getWorldUuid();
-            RemoveFromServerPlayerList removePacket = new RemoveFromServerPlayerList(new UUID[]{uuid});
-            Universe.get().broadcastPacket(removePacket);
-            ServerPlayerListPlayer playerListEntry = PlayerRefUtil.tabListEntry(playerRef, plainName);
-            AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{playerListEntry});
-            Universe.get().broadcastPacket(addPacket);
+        if (!service.setNickname(ref, store, playerRef, formattedNickname)) {
+            return false;
         }
 
         // Save message color
@@ -588,16 +496,6 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
             storage.removeMessageColor(uuid);
         } else {
             storage.setMessageColor(uuid, msgColor);
-        }
-
-        // Chat confirmation: nickname
-        playerRef.sendMessage(Message.join(
-            Message.raw(Messages.get(playerRef, Messages.SET_SUCCESS) + " ").color("#55FF55"),
-            MessageUtil.parse(formattedNickname)
-        ));
-
-        // Chat confirmation: message color
-        if (!msgColor.isEmpty()) {
             playerRef.sendMessage(Message.join(
                 Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_SET) + " ").color("#55FF55"),
                 Message.raw("Example").color(msgColor)
@@ -605,48 +503,6 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
         }
         return true;
     }
-
-    private void resetNickname(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
-        UUID uuid = playerRef.getUuid();
-        String originalName = storage.getOriginalUsername(uuid);
-        if (originalName == null) {
-            originalName = playerRef.getUsername();
-        }
-
-        storage.removeNickname(uuid);
-        storage.removeOriginalUsername(uuid);
-        storage.removeMessageColor(uuid);
-
-        // Restore PlayerRef.username to original (only if map nicknames enabled)
-        if (config.display.showOnMap) {
-            PlayerRefUtil.setUsername(playerRef, originalName);
-        }
-
-        // Remove nickname from LuckPerms if available
-        if (LuckPermsHook.isAvailable()) {
-            LuckPermsHook.removeDisplayName(uuid);
-        }
-
-        Nameplate nameplate = store.ensureAndGetComponent(ref, Nameplate.getComponentType());
-        nameplate.setText(originalName);
-
-        // Set DisplayNameComponent to original name (don't remove — NameplateRefChangeSystem.onComponentRemoved clears nameplate to "")
-        DisplayNameComponent displayNameComponent = new DisplayNameComponent(Message.raw(originalName));
-        store.putComponent(ref, DisplayNameComponent.getComponentType(), displayNameComponent);
-
-        UUID worldUuid = playerRef.getWorldUuid();
-        RemoveFromServerPlayerList removePacket = new RemoveFromServerPlayerList(new UUID[]{uuid});
-        Universe.get().broadcastPacket(removePacket);
-        ServerPlayerListPlayer playerListEntry = PlayerRefUtil.tabListEntry(playerRef, originalName);
-        AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{playerListEntry});
-        Universe.get().broadcastPacket(addPacket);
-
-        playerRef.sendMessage(Message.join(
-            Message.raw(Messages.get(playerRef, Messages.RESET_SUCCESS) + " ").color("#55FF55"),
-            Message.raw(originalName).color("#FFFFFF")
-        ));
-    }
-
     public static class EventData {
         public static final BuilderCodec<EventData> CODEC = BuilderCodec.builder(EventData.class, EventData::new)
             .append(new KeyedCodec<>("Action", Codec.STRING), (e, s) -> e.action = s, e -> e.action).add()

@@ -3,133 +3,56 @@ package com.nickname.plugin.listeners;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.nickname.plugin.chat.ChatFormatParser;
-import com.nickname.plugin.compat.EssentialsPlusCompat;
-import com.nickname.plugin.compat.MiniChatFormatterCompat;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.util.MessageUtil;
-import com.nickname.plugin.util.PlayerRefUtil;
 import com.nickname.plugin.storage.NicknameStorage;
 
 import javax.annotation.Nonnull;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 public class ChatListener {
+
+    private static final HytaleLogger LOGGER = HytaleLogger.get("NicknameChanger");
 
     private final NicknameStorage storage;
     private final PluginConfig config;
     private final ChatFormatParser formatParser;
-    private final MiniChatFormatterCompat mcfCompat;
-    private final EssentialsPlusCompat epCompat;
+    private final Set<String> reportedFormatters = ConcurrentHashMap.newKeySet();
 
-    public ChatListener(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config,
-                        @Nonnull MiniChatFormatterCompat mcfCompat, @Nonnull EssentialsPlusCompat epCompat) {
+    public ChatListener(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config) {
         this.storage = storage;
         this.config = config;
         this.formatParser = new ChatFormatParser(config.chatFormat);
-        this.mcfCompat = mcfCompat;
-        this.epCompat = epCompat;
     }
 
     /**
-     * FIRST priority handler: sets plain nickname into PlayerRef.username BEFORE any
-     * external formatters (EP at NORMAL, MCF at priority 1) read it.
-     *
-     * PlayerRef.username MUST contain ONLY plain text — tags break player lookup,
-     * world store operations, and other systems that match by username string.
-     */
-    public void onPlayerChatEarly(@Nonnull PlayerChatEvent event) {
-        if (event.isCancelled()) return;
-
-        PlayerRef sender = event.getSender();
-        UUID senderUuid = sender.getUuid();
-
-        // Save original username BEFORE nickname logic changes it —
-        // event content was generated with the original name
-        String originalUsername = sender.getUsername();
-
-        if (storage.isShowInChat() && storage.hasNickname(senderUuid)) {
-            String nickname = storage.getNickname(senderUuid);
-            if (epCompat.isAvailable() && MessageUtil.hasMarkup(nickname)) {
-                // EP's ColoredTextParser will render these tags
-                String epFormatted = MessageUtil.convertToEPFormat(nickname);
-                PlayerRefUtil.setUsername(sender, epFormatted);
-            } else {
-                // Standalone/MCF: plain text only (tags break world store)
-                String plainNick = MessageUtil.stripTags(nickname);
-                PlayerRefUtil.setUsername(sender, plainNick);
-            }
-        }
-
-        // Wrap message content in EP color tags for message color support
-        if (epCompat.isAvailable()) {
-            String msgColor = storage.getMessageColor(senderUuid);
-            if (msgColor != null && !msgColor.isEmpty()) {
-                String content = event.getContent();
-                // Sanitize: remove any < > from message to prevent tag injection
-                String safeMessage = content.replace("<", "").replace(">", "");
-                // Wrap entire content in EP color format
-                String coloredMessage;
-                if (msgColor.startsWith("gradient:")) {
-                    String[] parts = msgColor.split(":");
-                    if (parts.length == 3) {
-                        coloredMessage = "<gradient:" + parts[1] + ":" + parts[2] + ">" + safeMessage + "</gradient>";
-                    } else {
-                        coloredMessage = safeMessage;
-                    }
-                } else {
-                    // Solid hex color like #FF5555
-                    coloredMessage = "<" + msgColor + ">" + safeMessage + "</" + msgColor + ">";
-                }
-                event.setContent(coloredMessage);
-            }
-        }
-    }
-
-    /**
-     * LATE priority handler: restores original username in PlayerRef, then either
-     * defers to external formatters (EP/MCF) or applies own formatting in standalone mode.
-     *
-     * LATE (10922) runs after MCF's formatter-setting handler at priority (short)1,
-     * but before MCF's LAST handler that checks if its formatter is still active.
-     *
-     * Event flow with MCF:
-     * 1. FIRST: NNC sets plain nickname → PlayerRef.username = "Morgott"
-     * 2. (short)1: MCF sets its formatter, reads PlayerRef for username placeholder
-     * 3. LATE: NNC restores original username, detects MCF → doesn't set formatter
-     * 4. LAST: MCF checks formatter is still MCF's → OK
-     *
-     * Event flow with EP:
-     * 1. FIRST: NNC sets plain nickname → PlayerRef.username = "Morgott"
-     * 2. NORMAL: EP reads getUsername() → "Morgott" → formats with group colors → cancels event
-     * 3. LATE: NNC restores username, event cancelled → return
+     * LAST priority: format the message only if no other plugin owns chat.
+     * <p>
+     * Chat plugins either cancel the event and send their own messages (EssentialsPlus,
+     * EliteEssentials, Werchat) or install their own formatter (mini-chat-formatter, HyperPerms,
+     * old LuckPerms, KyuubiSoft). Both are left untouched: those plugins show nicknames through
+     * NNC's PlaceholderAPI placeholders instead. The player's username is never modified.
      */
     public void onPlayerChat(@Nonnull PlayerChatEvent event) {
-        // Always restore original username so it doesn't persist in PlayerRef
+        if (event.isCancelled()) return;
+
+        PlayerChatEvent.Formatter current = event.getFormatter();
+        if (current != PlayerChatEvent.DEFAULT_FORMATTER) {
+            if (reportedFormatters.add(current.getClass().getName())) {
+                LOGGER.at(Level.INFO).log("Chat is formatted by another plugin (%s); NickNameChanger leaves it alone. "
+                    + "Show nicknames there with the %%nnc_nickname%% PlaceholderAPI placeholder.", current.getClass().getName());
+            }
+            return;
+        }
+
         PlayerRef sender = event.getSender();
         UUID senderUuid = sender.getUuid();
-        String originalName = storage.getOriginalUsername(senderUuid);
-        if (originalName != null && storage.hasNickname(senderUuid)) {
-            PlayerRefUtil.setUsername(sender, originalName);
-        }
-
-        if (event.isCancelled()) {
-            return;
-        }
-
-        // Check for external formatters
-        boolean mcfActive = mcfCompat.isAvailable();
-        boolean epActive = epCompat.isAvailable();
-        boolean externalFormatter = mcfActive || epActive;
-
-        if (externalFormatter) {
-            // External formatter already has the nickname from FIRST handler
-            // Don't set own formatter
-            return;
-        }
-
-        // Standalone mode — own formatter with LP prefix/suffix + msgcolor
         boolean hasNickname = storage.isShowInChat() && storage.hasNickname(senderUuid);
 
         boolean hasLuckPerms = LuckPermsHook.isAvailable();
@@ -147,25 +70,10 @@ public class ChatListener {
             return;
         }
 
-        String currentName = sender.getUsername();
-        String displayName = hasNickname
-                ? storage.getDisplayName(senderUuid, currentName) : currentName;
-        final String safeName = displayName != null ? displayName : currentName;
-
-        // Save the old formatter to support decorator pattern (don't overwrite other plugins)
-        PlayerChatEvent.Formatter oldFormatter = event.getFormatter();
-        boolean hasExternalFormatter = oldFormatter != PlayerChatEvent.DEFAULT_FORMATTER;
+        String realName = sender.getUsername();
+        final String safeName = hasNickname ? storage.getDisplayName(senderUuid, realName) : realName;
 
         event.setFormatter((playerRef, message) -> {
-            // If another plugin set a formatter, delegate to it and apply NNC modifications on top
-            if (hasExternalFormatter) {
-                Message base = oldFormatter.format(playerRef, message);
-                // NNC can still apply message color by wrapping the message content
-                // but we respect the external formatter's structure (username, layout, etc.)
-                return base;
-            }
-
-            // Standalone mode — NNC formats from scratch
             Message result = Message.empty();
 
             for (ChatFormatParser.Token token : formatParser.getTokens()) {

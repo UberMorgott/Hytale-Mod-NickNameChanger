@@ -83,4 +83,5 @@ ui.settings.showOnNameplate = Show on Nameplate
 ui.settings.showInTabList = Show in Tab List / Map
 ui.settings.save = Save
 settings.saved = Settings saved!
+settings.saveFailed = Could not save config.json, see the server log.
 error.noSettingsPermission = You need admin permission to change display settings.

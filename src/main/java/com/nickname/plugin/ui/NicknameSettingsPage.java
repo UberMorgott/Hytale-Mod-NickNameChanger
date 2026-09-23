@@ -8,43 +8,35 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.protocol.packets.interface_.Page;
-import com.hypixel.hytale.protocol.packets.interface_.AddToServerPlayerList;
-import com.hypixel.hytale.protocol.packets.interface_.RemoveFromServerPlayerList;
-import com.hypixel.hytale.protocol.packets.interface_.ServerPlayerListPlayer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
-import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
-import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.nickname.plugin.NicknameChanger;
+import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.config.PluginConfig;
+import com.nickname.plugin.display.NicknameDisplay;
 import com.nickname.plugin.i18n.Messages;
-import com.nickname.plugin.storage.NicknameStorage;
-import com.nickname.plugin.util.MessageUtil;
-import com.nickname.plugin.util.PlayerRefUtil;
 
 import javax.annotation.Nonnull;
-import java.util.Collection;
-import java.util.UUID;
+import java.util.logging.Level;
 
 public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettingsPage.EventData> {
 
-    private final NicknameStorage storage;
     private final PluginConfig config;
+    private final NicknameDisplay display;
     private boolean showInChat;
     private boolean showOnNameplate;
     private boolean showInTabList;
 
-    public NicknameSettingsPage(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config, @Nonnull PlayerRef playerRef) {
+    public NicknameSettingsPage(@Nonnull PluginConfig config, @Nonnull NicknameDisplay display, @Nonnull PlayerRef playerRef) {
         super(playerRef, CustomPageLifetime.CanDismissOrCloseThroughInteraction, EventData.CODEC);
-        this.storage = storage;
         this.config = config;
+        this.display = display;
 
         this.showInChat = config.display.showInChat;
         this.showOnNameplate = config.display.showOnNameplate;
@@ -85,79 +77,26 @@ public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettin
                 case "toggle_nameplate" -> showOnNameplate = data.checked;
                 case "toggle_tablist" -> showInTabList = data.checked;
                 case "save" -> {
-                    config.display.showInChat = showInChat;
-                    config.display.showOnNameplate = showOnNameplate;
-                    config.display.showInTabList = showInTabList;
-                    NicknameChanger.getInstance().getConfigHolder().save();
-
-                    applyToAllPlayers();
-
-                    playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.SETTINGS_SAVED)).color("#55FF55"));
+                    // Permissions may have changed since the page was opened
+                    if (!PermissionsModule.get().hasPermission(playerRef.getUuid(), NickCommand.PERM_ADMIN, false)) {
+                        playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_SETTINGS_PERM)).color("#FF5555"));
+                    } else {
+                        config.display.showInChat = showInChat;
+                        config.display.showOnNameplate = showOnNameplate;
+                        config.display.showInTabList = showInTabList;
+                        display.refreshAll();
+                        NicknameChanger.getInstance().getConfigHolder().save().whenComplete((ignored, error) -> {
+                            if (error == null) {
+                                playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.SETTINGS_SAVED)).color("#55FF55"));
+                            } else {
+                                NicknameChanger.getInstance().getLogger().at(Level.SEVERE).withCause(error).log("Failed to save config.json");
+                                playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.SETTINGS_SAVE_FAILED)).color("#FF5555"));
+                            }
+                        });
+                    }
                     playerComponent.getPageManager().setPage(ref, store, Page.None);
-                    return;
                 }
-                case "cancel" -> {
-                    playerComponent.getPageManager().setPage(ref, store, Page.None);
-                    return;
-                }
-            }
-        }
-    }
-
-    private void applyToAllPlayers() {
-        Collection<PlayerRef> players = Universe.get().getPlayers();
-
-        for (PlayerRef pr : players) {
-            UUID uuid = pr.getUuid();
-            String nickname = storage.getNickname(uuid);
-            if (nickname == null) continue;
-
-            String plainName = MessageUtil.stripTags(nickname);
-            String orig = storage.getOriginalUsername(uuid);
-            String originalName = orig != null ? orig : pr.getUsername();
-
-            Ref<EntityStore> playerEntityRef = pr.getReference();
-            if (playerEntityRef == null || !playerEntityRef.isValid()) continue;
-            Store<EntityStore> playerStore = playerEntityRef.getStore();
-            if (playerStore == null) continue;
-            EntityStore externalData = (EntityStore) playerStore.getExternalData();
-            if (externalData == null) continue;
-            World playerWorld = externalData.getWorld();
-            if (playerWorld == null) continue;
-
-            // Schedule store access on the player's own world thread to avoid
-            // IllegalStateException when players are in different worlds
-            playerWorld.execute(() -> {
-                if (!playerEntityRef.isValid()) return;
-
-                // Nameplate
-                Nameplate nameplate = playerStore.ensureAndGetComponent(playerEntityRef, Nameplate.getComponentType());
-                if (showOnNameplate) {
-                    nameplate.setText(plainName);
-                    playerStore.putComponent(playerEntityRef, DisplayNameComponent.getComponentType(),
-                        new DisplayNameComponent(Message.raw(plainName)));
-                } else {
-                    nameplate.setText(originalName);
-                    playerStore.removeComponentIfExists(playerEntityRef, DisplayNameComponent.getComponentType());
-                }
-            });
-
-            // Tab list (broadcastPacket is thread-safe, doesn't touch ECS store)
-            RemoveFromServerPlayerList removePacket = new RemoveFromServerPlayerList(new UUID[]{uuid});
-            Universe.get().broadcastPacket(removePacket);
-
-            String tabName = showInTabList ? plainName : originalName;
-            ServerPlayerListPlayer entry = PlayerRefUtil.tabListEntry(pr, tabName);
-            AddToServerPlayerList addPacket = new AddToServerPlayerList(new ServerPlayerListPlayer[]{entry});
-            Universe.get().broadcastPacket(addPacket);
-
-            // PlayerRef.username (for map markers only)
-            if (config.display.showOnMap) {
-                if (showInTabList || showOnNameplate) {
-                    PlayerRefUtil.setUsername(pr, plainName);
-                } else {
-                    PlayerRefUtil.setUsername(pr, originalName);
-                }
+                case "cancel" -> playerComponent.getPageManager().setPage(ref, store, Page.None);
             }
         }
     }

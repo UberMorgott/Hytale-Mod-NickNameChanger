@@ -40,6 +40,7 @@ public final class Messages {
     // Settings
     public static final String UI_SETTINGS_TITLE = PREFIX + "ui.settings.title";
     public static final String SETTINGS_SAVED = PREFIX + "settings.saved";
+    public static final String SETTINGS_SAVE_FAILED = PREFIX + "settings.saveFailed";
 
     private Messages() {}
 

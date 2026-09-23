@@ -6,18 +6,18 @@ import com.hypixel.hytale.server.core.util.Config;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.universe.world.events.AddWorldEvent;
 
 import com.nickname.plugin.api.NicknameAPI;
 import com.nickname.plugin.commands.NickCommand;
-import com.nickname.plugin.compat.EssentialsPlusCompat;
-import com.nickname.plugin.compat.MiniChatFormatterCompat;
 import com.nickname.plugin.config.ConfigMigration;
 import com.nickname.plugin.config.PluginConfig;
+import com.nickname.plugin.display.NicknameDisplay;
 import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.listeners.ChatListener;
 import com.nickname.plugin.listeners.PlayerListener;
+import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
-import com.nickname.plugin.util.PlayerRefUtil;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -34,10 +34,7 @@ public class NicknameChanger extends JavaPlugin {
     private NicknameStorage storage;
     private PluginConfig config;
     private Path dataFolder;
-    private ChatListener chatListener;
-    private PlayerListener playerListener;
-    private MiniChatFormatterCompat mcfCompat;
-    private EssentialsPlusCompat epCompat;
+    private NicknameDisplay display;
 
     public NicknameChanger(@Nonnull JavaPluginInit init) {
         super(init);
@@ -69,23 +66,19 @@ public class NicknameChanger extends JavaPlugin {
         // Rewrite the file so it always lists every current option with its effective value
         config.version = getManifest().getVersion().toString();
         configHolder.save();
-        PlayerRefUtil.init();
 
         this.storage = new NicknameStorage(dataFolder, config);
         NicknameAPI.init(storage);
+        this.display = new NicknameDisplay(storage, config);
 
-        this.mcfCompat = new MiniChatFormatterCompat();
-        this.epCompat = new EssentialsPlusCompat();
-        this.chatListener = new ChatListener(storage, config, mcfCompat, epCompat);
-        this.playerListener = new PlayerListener(storage, config);
+        ChatListener chatListener = new ChatListener(storage, config);
+        PlayerListener playerListener = new PlayerListener(storage, config, display);
 
-        getCommandRegistry().registerCommand(new NickCommand(storage, config));
-        // Two handlers for chat formatting:
-        // FIRST: set plain nickname into PlayerRef.username BEFORE external formatters (EP, MCF) read it
-        // LATE: restore original username, then either defer to external formatters or apply own formatting
-        getEventRegistry().registerGlobal(EventPriority.FIRST, PlayerChatEvent.class, chatListener::onPlayerChatEarly);
-        getEventRegistry().registerGlobal(EventPriority.LATE, PlayerChatEvent.class, chatListener::onPlayerChat);
+        getCommandRegistry().registerCommand(new NickCommand(storage, config, display, new NicknameService(storage, config, display)));
+        // LAST: only format chat that no other plugin has taken over
+        getEventRegistry().registerGlobal(EventPriority.LAST, PlayerChatEvent.class, chatListener::onPlayerChat);
         getEventRegistry().registerGlobal(PlayerReadyEvent.class, playerListener::onPlayerReady);
+        getEventRegistry().registerGlobal(AddWorldEvent.class, display::onAddWorld);
     }
 
     @Override
@@ -96,15 +89,14 @@ public class NicknameChanger extends JavaPlugin {
         } catch (NoClassDefFoundError e) {
             getLogger().at(Level.INFO).log("LuckPerms not found, running without it.");
         }
-
-        // Eagerly detect external formatters so ChatListener knows from the first chat event
-        mcfCompat.detect();
-        epCompat.detect();
+        display.start();
     }
 
     @Override
     protected void shutdown() {
-        // Plugin disabled
+        if (display != null) {
+            display.stop();
+        }
     }
 
     public NicknameStorage getStorage() {
