@@ -106,12 +106,7 @@ public class ChatListener {
                             break;
                     }
                 } else {
-                    String text = token.value;
-                    if (MessageUtil.hasMarkup(text)) {
-                        result = result.insert(MessageUtil.parse(text));
-                    } else {
-                        result = result.insert(Message.raw(text).color("#AAAAAA"));
-                    }
+                    result = result.insert(MessageUtil.parse(token.value, "#AAAAAA"));
                 }
             }
 
@@ -119,26 +114,19 @@ public class ChatListener {
         });
     }
 
+    /** The player's text is never parsed as markup; a gradient colors it character by character. */
     private Message buildMessage(String message, String colorSpec) {
         if (colorSpec.startsWith("gradient:")) {
             String[] parts = colorSpec.split(":");
             if (parts.length == 3) {
-                // Escape angle brackets to prevent tag injection (e.g. player typing "</gradient>")
-                String safeMessage = message.replace("<", "").replace(">", "");
-                return MessageUtil.parse("<gradient:" + parts[1] + ":" + parts[2] + ">" + safeMessage + "</gradient>");
+                return MessageUtil.gradient(message, parts[1], parts[2]);
             }
         }
-        // Solid color — Message.raw() treats input as literal text, no injection risk
         return Message.raw(message).color(colorSpec);
     }
 
     private Message buildUsername(UUID uuid, String name) {
-        if (MessageUtil.hasMarkup(name)) {
-            return MessageUtil.parse(name);
-        } else if (storage.hasNickname(uuid)) {
-            return Message.raw(name).color("#FFFF55");
-        } else {
-            return Message.raw(name).color("#FFFFFF");
-        }
+        // Nicknames without their own color are yellow, real names white
+        return MessageUtil.parse(name, storage.hasNickname(uuid) ? "#FFFF55" : "#FFFFFF");
     }
 }
