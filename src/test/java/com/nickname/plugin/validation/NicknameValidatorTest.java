@@ -48,6 +48,27 @@ class NicknameValidatorTest {
     }
 
     @Test
+    void invalidRulesFailClosed() {
+        PluginConfig.NicknameRules rules = new PluginConfig.NicknameRules();
+        rules.allowedCharactersRegex = "[";
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        NicknameValidator validator = new NicknameValidator(rules, errors::add);
+        assertEquals(1, errors.size());
+        assertEquals(Messages.ERROR_RULES_INVALID, validator.validate("Bob Name").errorKey());
+        assertEquals(Messages.ERROR_RULES_INVALID, validator.validate("Bob").errorKey());
+
+        PluginConfig.NicknameRules lengths = new PluginConfig.NicknameRules();
+        lengths.minLength = 10;
+        lengths.maxLength = 5;
+        assertEquals(Messages.ERROR_RULES_INVALID, new NicknameValidator(lengths, errors::add).validate("Bobby").errorKey());
+    }
+
+    @Test
+    void emptyRegexUsesDefaultPolicy() {
+        assertTrue(validator("").validate("Bob Name").isValid());
+    }
+
+    @Test
     void bannedWordsAreCaseInsensitiveAndIgnoreFormatting() {
         assertEquals(Messages.ERROR_BANNED_WORD, validator("").validate("<b>AdM</b>in").errorKey());
     }

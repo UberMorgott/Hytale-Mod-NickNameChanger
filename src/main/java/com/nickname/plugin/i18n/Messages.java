@@ -21,6 +21,7 @@ public final class Messages {
     public static final String ERROR_INVALID_CHARACTERS = PREFIX + "error.invalidCharacters";
     public static final String ERROR_REAL_USERNAME = PREFIX + "error.realUsername";
     public static final String ERROR_NOT_SAVED = PREFIX + "error.notSaved";
+    public static final String ERROR_RULES_INVALID = PREFIX + "error.rulesInvalid";
     public static final String ERROR_NO_SETTINGS_PERM = PREFIX + "error.noSettingsPermission";
 
     // Nickname

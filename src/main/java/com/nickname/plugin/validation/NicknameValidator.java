@@ -31,6 +31,7 @@ public final class NicknameValidator {
     private final int maxLength;
     @Nullable
     private final Pattern allowedCharacters;
+    private final boolean configValid;
 
     /** Validated nickname: {@code nickname} keeps the formatting tags, {@code plain} is the visible text. */
     public record Result(@Nullable String nickname, @Nullable String plain, @Nullable String errorKey, Object[] args) {
@@ -43,35 +44,40 @@ public final class NicknameValidator {
         }
     }
 
-    /** @param configError receives a message for each invalid setting (a safe default is used instead) */
+    /**
+     * Invalid settings don't fall back to something more permissive: the validator then refuses
+     * every nickname (fail closed) until the config is fixed.
+     *
+     * @param configError receives a message for each invalid setting
+     */
     public NicknameValidator(@Nonnull PluginConfig.NicknameRules rules, @Nonnull Consumer<String> configError) {
         this.rules = rules;
-        int min = rules.minLength;
-        int max = rules.maxLength;
-        if (min < 1 || max < min) {
-            configError.accept("Invalid Nicknames.MinLength/MaxLength (" + min + "/" + max + "); using 2/32.");
-            min = 2;
-            max = 32;
+        this.minLength = rules.minLength;
+        this.maxLength = rules.maxLength;
+        Pattern pattern = null;
+        String problem = null;
+        if (minLength < 1 || maxLength < minLength) {
+            problem = "Invalid Nicknames.MinLength/MaxLength (" + minLength + "/" + maxLength + ")";
         }
-        this.minLength = min;
-        this.maxLength = max;
-        this.allowedCharacters = compile(rules.allowedCharactersRegex, configError);
-    }
-
-    @Nullable
-    private static Pattern compile(@Nullable String regex, @Nonnull Consumer<String> configError) {
-        if (regex == null || regex.isEmpty()) return null;
-        try {
-            return Pattern.compile(regex);
-        } catch (PatternSyntaxException e) {
-            configError.accept("Invalid Nicknames.AllowedCharactersRegex '" + regex + "': " + e.getDescription()
-                + ". Using AllowCyrillic/AllowUnicode instead.");
-            return null;
+        String regex = rules.allowedCharactersRegex;
+        if (regex != null && !regex.isEmpty()) {
+            try {
+                pattern = Pattern.compile(regex);
+            } catch (PatternSyntaxException e) {
+                problem = "Invalid Nicknames.AllowedCharactersRegex '" + regex + "': " + e.getDescription();
+            }
+        }
+        this.allowedCharacters = pattern;
+        this.configValid = problem == null;
+        if (problem != null) {
+            configError.accept(problem + ". Nobody can set a nickname until this is fixed in config.json.");
         }
     }
-
     @Nonnull
     public Result validate(@Nonnull String input) {
+        if (!configValid) {
+            return Result.error(Messages.ERROR_RULES_INVALID);
+        }
         String nickname = Normalizer.normalize(input.trim(), Normalizer.Form.NFC);
         if (nickname.isEmpty() || nickname.length() > MAX_INPUT_LENGTH) {
             return Result.error(Messages.ERROR_INVALID);
