@@ -11,9 +11,9 @@ import com.hypixel.hytale.server.core.universe.world.events.AddWorldEvent;
 
 import com.nickname.plugin.api.NicknameAPI;
 import com.nickname.plugin.commands.NickCommand;
-import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.nickname.plugin.compat.EssentialsPlusCompat;
 import com.nickname.plugin.compat.HyperPermsCompat;
+import com.nickname.plugin.compat.MiniChatFormatterCompat;
 import com.nickname.plugin.compat.NicknamePlaceholders;
 import com.nickname.plugin.config.ConfigMigration;
 import com.nickname.plugin.config.PluginConfig;
@@ -103,6 +103,11 @@ public class NicknameChanger extends JavaPlugin {
         NicknamePlaceholders placeholders = new NicknamePlaceholders(storage);
         PlaceholderApiHook.init(placeholders, getManifest().getVersion().toString());
         HyperPermsCompat.register(placeholders);
+        MiniChatFormatterCompat miniChatFormatter = MiniChatFormatterCompat.create(placeholders);
+        if (miniChatFormatter != null) {
+            // LATE: after mini-chat-formatter installs its formatter (priority 1), before its LAST check
+            getEventRegistry().registerGlobal(EventPriority.LATE, PlayerChatEvent.class, miniChatFormatter::onPlayerChat);
+        }
         logChatPluginHints();
         display.start();
     }
@@ -116,21 +121,17 @@ public class NicknameChanger extends JavaPlugin {
         HyperPermsCompat.unregister();
     }
 
-    /** Chat plugins that format chat themselves need NNC's placeholders in their own format. */
+    /** EliteEssentials formats chat from its own nick store; it can only show NNC nicknames through PlaceholderAPI. */
     private void logChatPluginHints() {
-        for (PluginIdentifier chatPlugin : new PluginIdentifier[]{
-                PluginDetector.MINI_CHAT_FORMATTER, PluginDetector.ELITE_ESSENTIALS}) {
-            if (!PluginDetector.isLoaded(chatPlugin)) continue;
-            if (PlaceholderApiHook.isAvailable()) {
-                getLogger().at(Level.INFO).log("%s formats chat: put %%nnc_nickname_mini%% (or %%nnc_nickname_legacy%%) "
-                    + "into its chat format to show nicknames.", chatPlugin);
-            } else {
-                getLogger().at(Level.WARNING).log("%s formats chat, so nicknames are not shown there. Install PlaceholderAPI "
-                    + "(HelpChat) and use %%nnc_nickname_mini%% in its chat format.", chatPlugin);
-            }
+        if (!PluginDetector.isLoaded(PluginDetector.ELITE_ESSENTIALS)) return;
+        if (PlaceholderApiHook.isAvailable()) {
+            getLogger().at(Level.INFO).log("EliteEssentials formats chat: put %%nnc_nickname_legacy%% instead of {player} "
+                + "into its chat formats to show nicknames.");
+        } else {
+            getLogger().at(Level.WARNING).log("EliteEssentials formats chat, so nicknames are not shown there. "
+                + "Install PlaceholderAPI (HelpChat) and use %%nnc_nickname_legacy%% in its chat formats.");
         }
     }
-
     public NicknameStorage getStorage() {
         return storage;
     }

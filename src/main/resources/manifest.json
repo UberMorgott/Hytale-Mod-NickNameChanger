@@ -15,7 +15,8 @@
     "LuckPerms:LuckPerms": "*",
     "HelpChat:PlaceholderAPI": "*",
     "com.hyperperms:HyperPerms": "*",
-    "fof1092:EssentialsPlus": "*"
+    "fof1092:EssentialsPlus": "*",
+    "lucko:mini-chat-formatter": "*"
   },
   "DisabledByDefault": false,
   "IncludesAssetPack": true
