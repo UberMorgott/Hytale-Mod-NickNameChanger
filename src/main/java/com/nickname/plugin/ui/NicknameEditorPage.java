@@ -311,7 +311,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
                     isMessage = true;
                 }
                 case "msg_color" -> {
-                    if (data.color != null) {
+                    if (isPresetColor(data.color)) {
                         msgColor = data.color;
                     }
                 }
@@ -324,7 +324,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
                 case "toggle_italic" -> isItalic = data.checked;
                 case "toggle_underline" -> isUnderline = data.checked;
                 case "color" -> {
-                    if (data.color != null) {
+                    if (isPresetColor(data.color)) {
                         currentColor = data.color;
                         nickColorMode = data.color.isEmpty() ? "none" : "color";
                     }
@@ -336,8 +336,8 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
                     }
                 }
                 case "grad_preset" -> {
-                    if (data.g1 != null) gradColor1 = data.g1;
-                    if (data.g2 != null) gradColor2 = data.g2;
+                    if (isPresetColor(data.g1) && !data.g1.isEmpty()) gradColor1 = data.g1;
+                    if (isPresetColor(data.g2) && !data.g2.isEmpty()) gradColor2 = data.g2;
                     nickColorMode = "gradient";
                 }
                 case "grad_color1" -> {
@@ -395,6 +395,11 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
         }
 
         sendUpdate(commandBuilder);
+    }
+
+    /** Preset colors come from the client: accept only "#RRGGBB" or "" (none). */
+    private static boolean isPresetColor(String color) {
+        return color != null && (color.isEmpty() || color.matches("^#[0-9A-Fa-f]{6}$"));
     }
 
     private boolean isValidHexColor(String color) {
@@ -491,15 +496,10 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
             return false;
         }
 
-        // Save message color
-        if (msgColor.isEmpty()) {
-            storage.removeMessageColor(uuid);
-        } else {
-            storage.setMessageColor(uuid, msgColor);
-            playerRef.sendMessage(Message.join(
-                Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_SET) + " ").color("#55FF55"),
-                Message.raw("Example").color(msgColor)
-            ));
+        // Message color only if it was changed (setting it is checked against nickname.msgcolor)
+        String storedColor = storage.getMessageColor(uuid);
+        if (!msgColor.equals(storedColor == null ? "" : storedColor)) {
+            service.setMessageColor(playerRef, msgColor);
         }
         return true;
     }

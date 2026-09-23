@@ -10,6 +10,7 @@ error.minLength = Nickname must be at least {min} characters.
 error.maxLength = Nickname cannot exceed {max} characters.
 error.invalid = Invalid nickname.
 error.noFormatPermission = You don't have permission to use colors and styles.
+error.noMsgColorPermission = You don't have permission to change your message color.
 error.bannedWord = This nickname contains a forbidden word.
 error.nicknameTaken = This nickname is already taken.
 error.invalidCharacters = The nickname contains characters that are not allowed.

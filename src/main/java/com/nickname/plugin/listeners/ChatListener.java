@@ -4,7 +4,9 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.chat.ChatFormatParser;
+import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.util.MessageUtil;
@@ -63,7 +65,10 @@ public class ChatListener {
 
         boolean hasLpData = (prefix != null && !prefix.isEmpty())
                 || (suffix != null && !suffix.isEmpty());
-        boolean hasMsgColor = storage.getMessageColor(senderUuid) != null;
+        // A stored color is ignored once nickname.msgcolor is revoked
+        final String msgColor = PermissionsModule.get().hasPermission(senderUuid, NickCommand.PERM_MSGCOLOR, true)
+                ? storage.getMessageColor(senderUuid) : null;
+        boolean hasMsgColor = msgColor != null;
 
         // Skip if nothing to contribute
         if (!hasNickname && !hasLpData && !hasMsgColor) {
@@ -93,7 +98,6 @@ public class ChatListener {
                             result = result.insert(buildUsername(senderUuid, safeName));
                             break;
                         case "message":
-                            String msgColor = storage.getMessageColor(senderUuid);
                             if (msgColor != null) {
                                 result = result.insert(buildMessage(message, msgColor));
                             } else {

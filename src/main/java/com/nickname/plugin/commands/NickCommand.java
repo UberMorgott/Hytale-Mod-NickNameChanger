@@ -29,6 +29,8 @@ public class NickCommand extends AbstractPlayerCommand {
     public static final String PERM_USE = "nickname.use";
     public static final String PERM_FORMAT = "nickname.format";
     public static final String PERM_ADMIN = "nickname.admin";
+    /** Chat message color; separate from nickname.format (nickname colors). Default: allowed. */
+    public static final String PERM_MSGCOLOR = "nickname.msgcolor";
 
     private final NicknameStorage storage;
     private final PluginConfig config;
@@ -88,8 +90,14 @@ public class NickCommand extends AbstractPlayerCommand {
             return;
         }
 
-        if (arg.split("\\s+", 2)[0].equalsIgnoreCase("msgcolor")) {
-            handleMsgColor(playerRef, playerUuid, arg);
+        String[] words = arg.split("\\s+", 2);
+        if (words[0].equalsIgnoreCase("msgcolor")) {
+            // /nick msgcolor <#HEX | gradient:#HEX1:#HEX2 | reset>
+            if (words.length < 2) {
+                playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_USAGE)).color("#FFFF55"));
+            } else {
+                service.setMessageColor(playerRef, words[1].trim());
+            }
             return;
         }
 
@@ -106,54 +114,6 @@ public class NickCommand extends AbstractPlayerCommand {
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player != null) {
             player.getPageManager().openCustomPage(ref, store, page);
-        }
-    }
-
-    private void handleMsgColor(@Nonnull PlayerRef playerRef, @Nonnull UUID uuid, @Nonnull String arg) {
-        // Check format permission
-        if (!PermissionsModule.get().hasPermission(uuid, PERM_FORMAT, true)) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_FORMAT_PERM)).color("#FF5555"));
-            return;
-        }
-
-        // Parse: "msgcolor #FF5555" or "msgcolor gradient:#FF5555:#5555FF" or "msgcolor reset"
-        String[] parts = arg.split("\\s+", 2);
-        if (parts.length < 2) {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_USAGE)).color("#FFFF55"));
-            return;
-        }
-
-        String value = parts[1].trim();
-
-        if (value.equalsIgnoreCase("reset") || value.equalsIgnoreCase("off") || value.equalsIgnoreCase("clear")) {
-            storage.removeMessageColor(uuid);
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_RESET)).color("#55FF55"));
-            return;
-        }
-
-        // Validate: #RRGGBB or gradient:#HEX1:#HEX2
-        if (value.matches("^#[0-9A-Fa-f]{6}$")) {
-            // Solid color
-            storage.setMessageColor(uuid, value.toUpperCase());
-            playerRef.sendMessage(Message.join(
-                Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_SET) + " ").color("#55FF55"),
-                Message.raw(value).color(value)
-            ));
-        } else if (value.toLowerCase().startsWith("gradient:")) {
-            // gradient:#HEX1:#HEX2
-            String[] gradParts = value.split(":");
-            if (gradParts.length == 3 && gradParts[1].matches("^#[0-9A-Fa-f]{6}$") && gradParts[2].matches("^#[0-9A-Fa-f]{6}$")) {
-                String stored = "gradient:" + gradParts[1].toUpperCase() + ":" + gradParts[2].toUpperCase();
-                storage.setMessageColor(uuid, stored);
-                playerRef.sendMessage(Message.join(
-                    Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_SET) + " ").color("#55FF55"),
-                    MessageUtil.parse("<gradient:" + gradParts[1] + ":" + gradParts[2] + ">Example text</gradient>")
-                ));
-            } else {
-                playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_USAGE)).color("#FFFF55"));
-            }
-        } else {
-            playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_USAGE)).color("#FFFF55"));
         }
     }
 }

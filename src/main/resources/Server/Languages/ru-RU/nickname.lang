@@ -10,6 +10,7 @@ error.minLength = Никнейм должен быть минимум {min} си
 error.maxLength = Никнейм не может превышать {max} символов.
 error.invalid = Недопустимый никнейм.
 error.noFormatPermission = У вас нет прав на использование цветов и стилей.
+error.noMsgColorPermission = У вас нет прав на изменение цвета сообщений.
 error.bannedWord = Этот никнейм содержит запрещённое слово.
 error.nicknameTaken = Этот никнейм уже занят.
 error.invalidCharacters = Никнейм содержит недопустимые символы.
