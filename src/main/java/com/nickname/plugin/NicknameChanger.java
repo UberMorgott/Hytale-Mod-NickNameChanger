@@ -141,7 +141,7 @@ public class NicknameChanger extends JavaPlugin {
     /** One line with what was found and which plugin formats chat, plus what to configure if needed. */
     private void logIntegrations(EssentialsPlusCompat essentialsPlus, EliteEssentialsCompat eliteEssentials,
                                  MiniChatFormatterCompat miniChatFormatter, boolean hyperPerms) {
-        String found = "LuckPerms=" + LuckPermsHook.isAvailable()
+        String found = "LuckPerms=" + LuckPermsHook.isLoaded()
             + ", PlaceholderAPI=" + PlaceholderApiHook.isAvailable()
             + ", EssentialsPlus=" + PluginDetector.isLoaded(PluginDetector.ESSENTIALS_PLUS)
             + ", EliteEssentials=" + PluginDetector.isLoaded(PluginDetector.ELITE_ESSENTIALS)

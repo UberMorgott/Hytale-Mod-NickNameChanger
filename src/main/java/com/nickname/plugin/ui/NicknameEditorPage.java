@@ -15,12 +15,12 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.util.MessageUtil;
 import com.nickname.plugin.i18n.Messages;
 import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
+import com.nickname.plugin.util.Permissions;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -269,7 +269,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
 
         // Permissions may have been revoked while the page was open
         if (("apply".equals(data.action) || "reset".equals(data.action))
-                && !PermissionsModule.get().hasPermission(playerRef.getUuid(), NickCommand.PERM_USE, true)) {
+                && !Permissions.has(playerRef.getUuid(), NickCommand.PERM_USE, true)) {
             playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_USE_PERM)).color("#FF5555"));
             playerComponent.getPageManager().setPage(ref, store, Page.None);
             return;
@@ -495,7 +495,7 @@ public class NicknameEditorPage extends InteractiveCustomUIPage<NicknameEditorPa
 
         // Strip formatting if player lacks nickname.format permission
         String formattedNickname;
-        if (hasFormatting() && !PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_FORMAT, true)) {
+        if (hasFormatting() && !Permissions.has(uuid, NickCommand.PERM_FORMAT, true)) {
             formattedNickname = currentNickname.trim();
             playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_FORMAT_PERM)).color("#FF5555"));
         } else {

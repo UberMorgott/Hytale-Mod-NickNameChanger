@@ -8,7 +8,6 @@ import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.CustomUIPage;
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -18,6 +17,7 @@ import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.ui.NicknameEditorPage;
 import com.nickname.plugin.ui.NicknameSettingsPage;
+import com.nickname.plugin.util.Permissions;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -48,7 +48,7 @@ public class NickCommand extends AbstractPlayerCommand {
     @Override
     public boolean hasPermission(@Nonnull CommandSender sender) {
         // Default: allowed. Deny only with explicit "-nickname.use"
-        return sender.hasPermission(PERM_USE, true);
+        return sender instanceof PlayerRef player ? Permissions.has(player.getUuid(), PERM_USE, true) : sender.hasPermission(PERM_USE, true);
     }
 
     /** Runs on the player's world thread; AbstractPlayerCommand rejects non-player senders. */
@@ -72,7 +72,7 @@ public class NickCommand extends AbstractPlayerCommand {
         }
 
         if (arg.equalsIgnoreCase("settings")) {
-            if (!PermissionsModule.get().hasPermission(playerUuid, PERM_ADMIN, false)) {
+            if (!Permissions.has(playerUuid, PERM_ADMIN, false)) {
                 playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_SETTINGS_PERM)).color("#FF5555"));
                 return;
             }

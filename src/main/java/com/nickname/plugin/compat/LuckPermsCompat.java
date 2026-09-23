@@ -4,6 +4,7 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.cacheddata.CachedMetaData;
 import net.luckperms.api.model.user.User;
+import net.luckperms.api.util.Tristate;
 
 import java.util.UUID;
 
@@ -24,6 +25,14 @@ public class LuckPermsCompat {
     private static CachedMetaData cachedMeta(UUID uuid) {
         User user = luckPerms.getUserManager().getUser(uuid);
         return user != null ? user.getCachedData().getMetaData() : null;
+    }
+
+    /** Explicit value of the node for an online (cached) user, or {@code null} if not set. */
+    public static Boolean checkPermission(UUID uuid, String node) {
+        User user = luckPerms.getUserManager().getUser(uuid);
+        if (user == null) return null;
+        Tristate result = user.getCachedData().getPermissionData().checkPermission(node);
+        return result == Tristate.UNDEFINED ? null : result.asBoolean();
     }
 
     public static String getPrefix(UUID uuid) {

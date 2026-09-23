@@ -4,7 +4,6 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.chat.ChatFormatParser;
 import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.compat.EliteEssentialsCompat;
@@ -14,6 +13,7 @@ import com.nickname.plugin.hooks.LuckPermsHook;
 import com.nickname.plugin.hooks.PlaceholderApiHook;
 import com.nickname.plugin.util.MessageUtil;
 import com.nickname.plugin.storage.NicknameStorage;
+import com.nickname.plugin.util.Permissions;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -75,7 +75,7 @@ public class ChatListener {
     /** The stored message color, ignored once nickname.msgcolor is revoked. */
     @Nullable
     private String messageColor(@Nonnull UUID uuid) {
-        return PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_MSGCOLOR, true)
+        return Permissions.has(uuid, NickCommand.PERM_MSGCOLOR, true)
             ? storage.getMessageColor(uuid) : null;
     }
     /**

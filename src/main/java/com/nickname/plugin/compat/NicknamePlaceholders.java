@@ -1,9 +1,9 @@
 package com.nickname.plugin.compat;
 
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
+import com.nickname.plugin.util.Permissions;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -55,7 +55,7 @@ public final class NicknamePlaceholders {
 
     @Nullable
     private String messageColor(@Nonnull UUID uuid) {
-        if (!PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_MSGCOLOR, true)) return null;
+        if (!Permissions.has(uuid, NickCommand.PERM_MSGCOLOR, true)) return null;
         return storage.getMessageColor(uuid);
     }
 

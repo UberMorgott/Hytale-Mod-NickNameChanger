@@ -4,7 +4,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -16,6 +15,7 @@ import com.nickname.plugin.i18n.Messages;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
 import com.nickname.plugin.validation.NicknameValidator;
+import com.nickname.plugin.util.Permissions;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -60,7 +60,7 @@ public final class NicknameService {
             return false;
         }        // Checked here, not in the UI: the editor's text field can carry tags too
         if (MessageUtil.hasMarkup(result.nickname())
-                && !PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_FORMAT, true)) {
+                && !Permissions.has(uuid, NickCommand.PERM_FORMAT, true)) {
             error(playerRef, Messages.get(playerRef, Messages.ERROR_NO_FORMAT_PERM));
             return false;
         }
@@ -126,7 +126,7 @@ public final class NicknameService {
             playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.MSGCOLOR_RESET)).color("#55FF55"));
             return;
         }
-        if (!PermissionsModule.get().hasPermission(uuid, NickCommand.PERM_MSGCOLOR, true)) {
+        if (!Permissions.has(uuid, NickCommand.PERM_MSGCOLOR, true)) {
             error(playerRef, Messages.get(playerRef, Messages.ERROR_NO_MSGCOLOR_PERM));
             return;
         }

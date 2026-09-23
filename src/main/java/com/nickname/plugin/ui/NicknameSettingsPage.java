@@ -11,7 +11,6 @@ import com.hypixel.hytale.protocol.packets.interface_.Page;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
-import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -21,6 +20,7 @@ import com.nickname.plugin.commands.NickCommand;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.service.NicknameService;
 import com.nickname.plugin.i18n.Messages;
+import com.nickname.plugin.util.Permissions;
 
 import javax.annotation.Nonnull;
 import java.util.logging.Level;
@@ -78,7 +78,7 @@ public class NicknameSettingsPage extends InteractiveCustomUIPage<NicknameSettin
                 case "toggle_tablist" -> showInTabList = data.checked;
                 case "save" -> {
                     // Permissions may have changed since the page was opened
-                    if (!PermissionsModule.get().hasPermission(playerRef.getUuid(), NickCommand.PERM_ADMIN, false)) {
+                    if (!Permissions.has(playerRef.getUuid(), NickCommand.PERM_ADMIN, false)) {
                         playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_SETTINGS_PERM)).color("#FF5555"));
                     } else {
                         config.display.showInChat = showInChat;
