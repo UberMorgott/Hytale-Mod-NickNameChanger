@@ -1,13 +1,11 @@
 package com.nickname.plugin.compat;
 
-import com.hypixel.hytale.logger.HytaleLogger;
 import com.nickname.plugin.hooks.PluginDetector;
 import com.nickname.plugin.storage.NicknameStorage;
 import com.nickname.plugin.util.MessageUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.UUID;
@@ -15,21 +13,14 @@ import java.util.logging.Level;
 
 /**
  * EssentialsPlus (fof1092) formats chat itself and shows {@code {player}} from its own
- * {@code NickManager}. This adapter keeps EP's nickname in sync with the NNC nickname through
- * EP's public NickManager API (set on nickname change and on join, removed on reset or when
- * Display.ShowInChat is off). The player's username is never touched.
- * <p>
- * EP validates nicknames itself (letters, digits and _ only, its own length/blacklist/duplicate
- * rules); a refusal is reported, never bypassed. An EP nickname the player had before is kept
- * aside and restored when NNC stops using EP's nickname.
- * Uses reflection (verified against EssentialsPlus 1.20.0), so nothing of EP is needed at compile time.
+ * {@code NickManager}; this mirror keeps that nickname equal to the NNC nickname.
+ * EP only accepts A-Z, a-z, 0-9 and _ (plus its own length/blacklist/duplicate rules); other
+ * nicknames are refused by EP and reported. Reflection, verified against EssentialsPlus 1.20.0.
  */
-public final class EssentialsPlusCompat {
+public final class EssentialsPlusCompat extends NicknameMirror {
 
-    private static final HytaleLogger LOGGER = HytaleLogger.get("NicknameChanger");
     private static final String BASE = "de.fof1092.essentialsplus.";
 
-    private final NicknameStorage storage;
     private final Method getInstance;
     private final Method getNickname;
     private final Method setNickname;
@@ -41,7 +32,7 @@ public final class EssentialsPlusCompat {
     private final Method chatEnabled;
 
     private EssentialsPlusCompat(NicknameStorage storage) throws ReflectiveOperationException {
-        this.storage = storage;
+        super(storage, "essentialsplus");
         Class<?> nickManager = Class.forName(BASE + "features.player.nick.NickManager");
         Class<?> result = Class.forName(BASE + "features.player.nick.NickManager$NicknameValidationResult");
         Class<?> configManager = Class.forName(BASE + "core.ConfigManager");
@@ -61,14 +52,18 @@ public final class EssentialsPlusCompat {
     public static EssentialsPlusCompat create(@Nonnull NicknameStorage storage) {
         if (!PluginDetector.isLoaded(PluginDetector.ESSENTIALS_PLUS)) return null;
         try {
-            EssentialsPlusCompat compat = new EssentialsPlusCompat(storage);
-            LOGGER.at(Level.INFO).log("EssentialsPlus found: NNC nicknames are synced to EssentialsPlus' {player}.");
-            return compat;
+            return new EssentialsPlusCompat(storage);
         } catch (ReflectiveOperationException | LinkageError e) {
             LOGGER.at(Level.WARNING).withCause(e).log("Unsupported EssentialsPlus version; nickname sync disabled. "
                 + "Use %%nnc_nickname_mini%% (PlaceholderAPI) in its chat format instead.");
             return null;
         }
+    }
+
+    @Nonnull
+    @Override
+    public String name() {
+        return "EssentialsPlus";
     }
 
     /** True if EssentialsPlus currently formats chat (its chat.enabled setting). */
@@ -80,56 +75,29 @@ public final class EssentialsPlusCompat {
         }
     }
 
-    /**
-     * Brings EP's nickname in line with the NNC nickname (or removes it). Call after the NNC
-     * nickname changed and when the player joins (EP has loaded its user by then).
-     *
-     * @param previousNickname the NNC nickname before the change, to recognise the EP nickname NNC set earlier
-     * @return EP's reason if it refused the nickname, otherwise {@code null}
-     */
+    @Nonnull
+    @Override
+    protected String convert(@Nonnull String nickname) {
+        return MessageUtil.toEssentialsPlus(nickname);
+    }
+
     @Nullable
-    public String sync(@Nonnull UUID uuid, @Nullable String previousNickname) {
-        String nickname = storage.getNickname(uuid);
-        String desired = nickname != null && storage.isShowInChat() ? MessageUtil.toEssentialsPlus(nickname) : null;
-        try {
-            Object manager = getInstance.invoke(null);
-            String current = (String) getNickname.invoke(manager, uuid);
-            boolean setByNnc = current != null && (current.equals(desired)
-                || (previousNickname != null && current.equals(MessageUtil.toEssentialsPlus(previousNickname)))
-                || (nickname != null && current.equals(MessageUtil.toEssentialsPlus(nickname))));
+    @Override
+    protected String current(@Nonnull UUID uuid) throws ReflectiveOperationException {
+        return (String) getNickname.invoke(getInstance.invoke(null), uuid);
+    }
 
-            if (desired != null) {
-                if (desired.equals(current)) return null;
-                if (current != null && !setByNnc && !storage.setEssentialsPlusNickname(uuid, current)) {
-                    return "could not back up the EssentialsPlus nickname";
-                }
-                Object result = setNickname.invoke(manager, uuid, desired);
-                return (boolean) resultIsValid.invoke(result)
-                    ? null : Objects.requireNonNullElse((String) resultReason.invoke(result), "refused");
-            }
+    @Nullable
+    @Override
+    protected String set(@Nonnull UUID uuid, @Nonnull String nickname) throws ReflectiveOperationException {
+        Object result = setNickname.invoke(getInstance.invoke(null), uuid, nickname);
+        return (boolean) resultIsValid.invoke(result)
+            ? null : Objects.requireNonNullElse((String) resultReason.invoke(result), "refused");
+    }
 
-            if (setByNnc) {
-                String own = storage.getEssentialsPlusNickname(uuid);
-                if (own == null) {
-                    removeNickname.invoke(manager, uuid);
-                } else {
-                    Object result = setNickname.invoke(manager, uuid, own);
-                    if (!(boolean) resultIsValid.invoke(result)) {
-                        removeNickname.invoke(manager, uuid);
-                        LOGGER.at(Level.INFO).log("Could not restore EssentialsPlus nickname '%s' of %s: %s",
-                            own, uuid, resultReason.invoke(result));
-                    }
-                    storage.setEssentialsPlusNickname(uuid, null);
-                }
-            }
-            return null;
-        } catch (InvocationTargetException e) {
-            LOGGER.at(Level.WARNING).withCause(e.getCause()).log("EssentialsPlus nickname sync failed for %s", uuid);
-            return String.valueOf(e.getCause());
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.at(Level.WARNING).withCause(e).log("EssentialsPlus nickname sync failed for %s", uuid);
-            return e.toString();
-        }
+    @Override
+    protected void remove(@Nonnull UUID uuid) throws ReflectiveOperationException {
+        removeNickname.invoke(getInstance.invoke(null), uuid);
     }
 
     /** EssentialsPlus markup wrapping the chat text in the player's message color. */

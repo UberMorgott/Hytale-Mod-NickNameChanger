@@ -24,8 +24,9 @@ public final class HyperPermsCompat {
 
     private HyperPermsCompat() {}
 
-    public static void register(@Nonnull NicknamePlaceholders placeholders) {
-        if (!PluginDetector.isLoaded(PluginDetector.HYPERPERMS)) return;
+    /** @return true if the placeholder was registered */
+    public static boolean register(@Nonnull NicknamePlaceholders placeholders) {
+        if (!PluginDetector.isLoaded(PluginDetector.HYPERPERMS)) return false;
         try {
             Class<?> formatter = Class.forName(FORMATTER_CLASS);
             Class<?> context = Class.forName(FORMATTER_CLASS + "$PlaceholderContext");
@@ -42,9 +43,10 @@ public final class HyperPermsCompat {
             };
             formatter.getMethod("registerPlaceholder", String.class, Function.class).invoke(null, PLACEHOLDER, handler);
             registered = true;
-            LOGGER.at(Level.INFO).log("HyperPerms found: use %%%s%% in its chat format to show nicknames.", PLACEHOLDER);
+            return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             LOGGER.at(Level.WARNING).withCause(e).log("Could not register the HyperPerms chat placeholder.");
+            return false;
         }
     }
 

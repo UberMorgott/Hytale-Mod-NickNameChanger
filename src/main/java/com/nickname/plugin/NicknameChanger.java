@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.world.events.AddWorldEvent;
 
 import com.nickname.plugin.api.NicknameAPI;
 import com.nickname.plugin.commands.NickCommand;
+import com.nickname.plugin.compat.EliteEssentialsCompat;
 import com.nickname.plugin.compat.EssentialsPlusCompat;
 import com.nickname.plugin.compat.HyperPermsCompat;
 import com.nickname.plugin.compat.MiniChatFormatterCompat;
@@ -42,6 +43,8 @@ public class NicknameChanger extends JavaPlugin {
     private PluginConfig config;
     private Path dataFolder;
     private NicknameDisplay display;
+    private NicknameService service;
+    private ChatListener chatListener;
 
     public NicknameChanger(@Nonnull JavaPluginInit init) {
         super(init);
@@ -79,16 +82,11 @@ public class NicknameChanger extends JavaPlugin {
         NicknameAPI.init(storage);
         this.display = new NicknameDisplay(storage, config);
 
-        EssentialsPlusCompat essentialsPlus = EssentialsPlusCompat.create(storage);
-        NicknameService service = new NicknameService(storage, config, display, essentialsPlus);
-        ChatListener chatListener = new ChatListener(storage, config, essentialsPlus);
+        this.service = new NicknameService(storage, config, display);
+        this.chatListener = new ChatListener(storage, config);
         PlayerListener playerListener = new PlayerListener(storage, config, display, service);
 
         getCommandRegistry().registerCommand(new NickCommand(storage, config, service));
-        if (essentialsPlus != null) {
-            // FIRST: message color for EssentialsPlus, which formats chat in its own NORMAL handler
-            getEventRegistry().registerGlobal(EventPriority.FIRST, PlayerChatEvent.class, chatListener::onPlayerChatEarly);
-        }
         // LAST: only format chat that no other plugin has taken over
         getEventRegistry().registerGlobal(EventPriority.LAST, PlayerChatEvent.class, chatListener::onPlayerChat);
         getEventRegistry().register(PlayerConnectEvent.class, playerListener::onPlayerConnect);
@@ -96,19 +94,36 @@ public class NicknameChanger extends JavaPlugin {
         getEventRegistry().registerGlobal(AddWorldEvent.class, display::onAddWorld);
     }
 
+    /**
+     * Optional integrations, all started only after the other plugins (they are optional
+     * dependencies, so they start first). Each adapter checks that its plugin is loaded before
+     * touching any of its classes, so any combination, including none, works.
+     */
     @Override
     protected void start() {
-        // Optional integrations: every plugin is set up by now
         LuckPermsHook.init(config.integrations.luckperms.enabled);
         NicknamePlaceholders placeholders = new NicknamePlaceholders(storage);
         PlaceholderApiHook.init(placeholders, getManifest().getVersion().toString());
-        HyperPermsCompat.register(placeholders);
+        boolean hyperPerms = HyperPermsCompat.register(placeholders);
+
+        EssentialsPlusCompat essentialsPlus = EssentialsPlusCompat.create(storage);
+        if (essentialsPlus != null) {
+            service.addMirror(essentialsPlus);
+            chatListener.setEssentialsPlus(essentialsPlus);
+            // FIRST: message color for EssentialsPlus, which formats chat in its own NORMAL handler
+            getEventRegistry().registerGlobal(EventPriority.FIRST, PlayerChatEvent.class, chatListener::onPlayerChatEarly);
+        }
+        EliteEssentialsCompat eliteEssentials = EliteEssentialsCompat.create(storage);
+        if (eliteEssentials != null) {
+            service.addMirror(eliteEssentials);
+        }
         MiniChatFormatterCompat miniChatFormatter = MiniChatFormatterCompat.create(placeholders);
         if (miniChatFormatter != null) {
             // LATE: after mini-chat-formatter installs its formatter (priority 1), before its LAST check
             getEventRegistry().registerGlobal(EventPriority.LATE, PlayerChatEvent.class, miniChatFormatter::onPlayerChat);
         }
-        logChatPluginHints();
+
+        logIntegrations(essentialsPlus, eliteEssentials, miniChatFormatter, hyperPerms);
         display.start();
     }
 
@@ -121,16 +136,30 @@ public class NicknameChanger extends JavaPlugin {
         HyperPermsCompat.unregister();
     }
 
-    /** EliteEssentials formats chat from its own nick store; it can only show NNC nicknames through PlaceholderAPI. */
-    private void logChatPluginHints() {
-        if (!PluginDetector.isLoaded(PluginDetector.ELITE_ESSENTIALS)) return;
-        if (PlaceholderApiHook.isAvailable()) {
-            getLogger().at(Level.INFO).log("EliteEssentials formats chat: put %%nnc_nickname_legacy%% instead of {player} "
-                + "into its chat formats to show nicknames.");
+    /** One line with what was found and which plugin formats chat, plus what to configure if needed. */
+    private void logIntegrations(EssentialsPlusCompat essentialsPlus, EliteEssentialsCompat eliteEssentials,
+                                 MiniChatFormatterCompat miniChatFormatter, boolean hyperPerms) {
+        String found = "LuckPerms=" + LuckPermsHook.isAvailable()
+            + ", PlaceholderAPI=" + PlaceholderApiHook.isAvailable()
+            + ", EssentialsPlus=" + PluginDetector.isLoaded(PluginDetector.ESSENTIALS_PLUS)
+            + ", EliteEssentials=" + PluginDetector.isLoaded(PluginDetector.ELITE_ESSENTIALS)
+            + ", mini-chat-formatter=" + PluginDetector.isLoaded(PluginDetector.MINI_CHAT_FORMATTER)
+            + ", HyperPerms=" + PluginDetector.isLoaded(PluginDetector.HYPERPERMS);
+        String route;
+        if (essentialsPlus != null && essentialsPlus.isChatEnabled()) {
+            route = "EssentialsPlus formats chat; nicknames are synced into its {player} (EP accepts only A-Z, 0-9, _)";
+        } else if (eliteEssentials != null) {
+            route = "EliteEssentials formats chat (if its chatFormat is enabled); nicknames are synced into its {player}";
+        } else if (miniChatFormatter != null) {
+            route = "mini-chat-formatter formats chat; <username> shows the nickname";
+        } else if (PluginDetector.isLoaded(PluginDetector.MINI_CHAT_FORMATTER)) {
+            route = "mini-chat-formatter formats chat; use %nnc_nickname_mini% (needs PlaceholderAPI) instead of <username>";
+        } else if (hyperPerms) {
+            route = "HyperPerms formats chat; use %nnc_nickname% instead of %player% in its chat format";
         } else {
-            getLogger().at(Level.WARNING).log("EliteEssentials formats chat, so nicknames are not shown there. "
-                + "Install PlaceholderAPI (HelpChat) and use %%nnc_nickname_legacy%% in its chat formats.");
+            route = "NickNameChanger formats chat (ChatFormat); another formatting plugin is reported at its first message";
         }
+        getLogger().at(Level.INFO).log("Integrations: %s. Chat: %s.", found, route);
     }
     public NicknameStorage getStorage() {
         return storage;

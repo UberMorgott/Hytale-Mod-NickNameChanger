@@ -16,7 +16,8 @@
     "HelpChat:PlaceholderAPI": "*",
     "com.hyperperms:HyperPerms": "*",
     "fof1092:EssentialsPlus": "*",
-    "lucko:mini-chat-formatter": "*"
+    "lucko:mini-chat-formatter": "*",
+    "com.eliteessentials:EliteEssentials": "*"
   },
   "DisabledByDefault": false,
   "IncludesAssetPack": true

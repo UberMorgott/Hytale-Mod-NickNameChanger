@@ -38,20 +38,20 @@ public class NicknameStorage {
     private final Map<UUID, String> nicknames = new HashMap<>();
     private final Map<UUID, String> originalUsernames = new HashMap<>();
     private final Map<UUID, String> messageColors = new HashMap<>();
-    /** EssentialsPlus nicknames players had before NNC synced theirs (restored on reset). */
-    private final Map<UUID, String> essentialsPlusNicknames = new HashMap<>();
+    /** Per chat plugin: the nicknames players had there before NNC synced theirs (restored later). */
+    private final Map<String, Map<UUID, String>> replacedNicknames = new HashMap<>();
+    private final Path dataFolder;
     private final Set<Path> unwritableFiles = new HashSet<>();
     private final Path storageFile;
     private final Path originalsFile;
     private final Path messageColorsFile;
-    private final Path essentialsPlusFile;
     private final PluginConfig config;
 
     public NicknameStorage(Path dataFolder, PluginConfig config) {
         this.storageFile = dataFolder.resolve("nicknames.json");
         this.originalsFile = dataFolder.resolve("originals.json");
         this.messageColorsFile = dataFolder.resolve("messagecolors.json");
-        this.essentialsPlusFile = dataFolder.resolve("essentialsplus-nicknames.json");
+        this.dataFolder = dataFolder;
         this.config = config;
         load();
     }
@@ -150,16 +150,27 @@ public class NicknameStorage {
         return setMessageColor(uuid, null);
     }
 
-    // --- EssentialsPlus nicknames replaced by NNC ---
+    // --- Nicknames of other plugins replaced by NNC (file <plugin>-nicknames.json) ---
 
-    public synchronized String getEssentialsPlusNickname(UUID uuid) {
-        return essentialsPlusNicknames.get(uuid);
+    public synchronized String getReplacedNickname(String plugin, UUID uuid) {
+        return replacedNicknames(plugin).get(uuid);
     }
 
-    public synchronized boolean setEssentialsPlusNickname(UUID uuid, @Nullable String nickname) {
-        return update(essentialsPlusNicknames, essentialsPlusFile, uuid, nickname);
+    public synchronized boolean setReplacedNickname(String plugin, UUID uuid, @Nullable String nickname) {
+        return update(replacedNicknames(plugin), replacedNicknamesFile(plugin), uuid, nickname);
     }
 
+    private Map<UUID, String> replacedNicknames(String plugin) {
+        return replacedNicknames.computeIfAbsent(plugin, key -> {
+            Map<UUID, String> map = new HashMap<>();
+            loadMap(replacedNicknamesFile(key), map);
+            return map;
+        });
+    }
+
+    private Path replacedNicknamesFile(String plugin) {
+        return dataFolder.resolve(plugin + "-nicknames.json");
+    }
     // --- Global display settings (read from config) ---
 
     public boolean isShowInChat() {
@@ -188,7 +199,6 @@ public class NicknameStorage {
         loadMap(storageFile, nicknames);
         loadMap(messageColorsFile, messageColors);
         loadMap(originalsFile, originalUsernames);
-        loadMap(essentialsPlusFile, essentialsPlusNicknames);
     }
 
     /**

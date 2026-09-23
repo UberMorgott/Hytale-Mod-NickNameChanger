@@ -33,15 +33,18 @@ public class ChatListener {
     private final ChatFormatParser formatParser;
     private final Set<String> reportedFormatters = ConcurrentHashMap.newKeySet();
     @Nullable
-    private final EssentialsPlusCompat essentialsPlus;
+    private volatile EssentialsPlusCompat essentialsPlus;
     /** Chat text before EssentialsPlus color tags were added, to undo it if EP didn't take the message. */
     private final Map<PlayerChatEvent, String> uncoloredContent = Collections.synchronizedMap(new WeakHashMap<>());
 
-    public ChatListener(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config,
-                        @Nullable EssentialsPlusCompat essentialsPlus) {
+    public ChatListener(@Nonnull NicknameStorage storage, @Nonnull PluginConfig config) {
         this.storage = storage;
         this.config = config;
         this.formatParser = new ChatFormatParser(config.chatFormat);
+    }
+
+    /** Enables {@link #onPlayerChatEarly} message colors for EssentialsPlus chat. */
+    public void setEssentialsPlus(@Nonnull EssentialsPlusCompat essentialsPlus) {
         this.essentialsPlus = essentialsPlus;
     }
 
@@ -50,6 +53,7 @@ public class ChatListener {
      * text, so the player's message color is added around it (EP parses players' text as markup anyway).
      */
     public void onPlayerChatEarly(@Nonnull PlayerChatEvent event) {
+        EssentialsPlusCompat essentialsPlus = this.essentialsPlus;
         if (event.isCancelled() || essentialsPlus == null || !essentialsPlus.isChatEnabled()) return;
         String color = messageColor(event.getSender().getUuid());
         if (color != null) {
