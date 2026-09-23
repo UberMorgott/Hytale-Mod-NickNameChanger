@@ -6,8 +6,6 @@
 command.description = Definir seu apelido de exibição
 
 # Erros
-error.playersOnly = Este comando só pode ser usado por jogadores.
-error.notInWorld = Erro: Jogador não está no mundo.
 error.minLength = O apelido deve ter pelo menos {min} caracteres.
 error.maxLength = O apelido não pode exceder {max} caracteres.
 error.invalid = Apelido inválido.

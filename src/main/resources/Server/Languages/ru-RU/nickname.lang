@@ -6,8 +6,6 @@
 command.description = Установить отображаемый никнейм
 
 # Ошибки
-error.playersOnly = Эта команда доступна только игрокам.
-error.notInWorld = Ошибка: Игрок не в мире.
 error.minLength = Никнейм должен быть минимум {min} символа.
 error.maxLength = Никнейм не может превышать {max} символов.
 error.invalid = Недопустимый никнейм.

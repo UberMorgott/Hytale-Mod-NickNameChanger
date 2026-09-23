@@ -11,8 +11,6 @@ public final class Messages {
     private static final String PREFIX = "nickname.";
 
     // Errors
-    public static final String ERROR_PLAYERS_ONLY = PREFIX + "error.playersOnly";
-    public static final String ERROR_NOT_IN_WORLD = PREFIX + "error.notInWorld";
     public static final String ERROR_MIN_LENGTH = PREFIX + "error.minLength";
     public static final String ERROR_MAX_LENGTH = PREFIX + "error.maxLength";
     public static final String ERROR_INVALID = PREFIX + "error.invalid";

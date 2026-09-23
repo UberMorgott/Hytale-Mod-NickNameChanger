@@ -6,8 +6,6 @@
 command.description = Set your display nickname
 
 # Errors
-error.playersOnly = This command can only be used by players.
-error.notInWorld = Error: Player not in world.
 error.minLength = Nickname must be at least {min} characters.
 error.maxLength = Nickname cannot exceed {max} characters.
 error.invalid = Invalid nickname.

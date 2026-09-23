@@ -1,8 +1,8 @@
 package com.nickname.plugin.commands;
 
-import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
@@ -28,9 +28,8 @@ import com.nickname.plugin.ui.NicknameSettingsPage;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
-public class NickCommand extends AbstractCommand {
+public class NickCommand extends AbstractPlayerCommand {
 
     public static final String PERM_USE = "nickname.use";
     public static final String PERM_FORMAT = "nickname.format";
@@ -40,11 +39,13 @@ public class NickCommand extends AbstractCommand {
     private final PluginConfig config;
 
     public NickCommand(NicknameStorage storage, PluginConfig config) {
-        super("nick", "Set your display nickname");
+        // "nnc" is unique to this plugin; "nick"/"nickname" still work unless another plugin
+        // (EliteEssentials, EssentialsPlus, ...) registers a command with that name.
+        super("nnc", "Set your display nickname");
         this.storage = storage;
         this.config = config;
         setAllowsExtraArguments(true);
-        addAliases("nickname");
+        addAliases("nick", "nickname");
     }
 
     @Override
@@ -53,99 +54,60 @@ public class NickCommand extends AbstractCommand {
         return sender.hasPermission(PERM_USE, true);
     }
 
+    /** Runs on the player's world thread; AbstractPlayerCommand rejects non-player senders. */
     @Override
-    protected CompletableFuture<Void> execute(@Nonnull CommandContext context) {
-        CommandSender sender = context.sender();
+    protected void execute(@Nonnull CommandContext context, @Nonnull Store<EntityStore> store,
+                           @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+        UUID playerUuid = playerRef.getUuid();
+        String username = playerRef.getUsername();
 
-        if (!(sender instanceof Player)) {
-            context.sendMessage(Message.raw(Messages.get("en-US", Messages.ERROR_PLAYERS_ONLY)).color("#FF5555"));
-            return CompletableFuture.completedFuture(null);
-        }
-
-        Player player = (Player) sender;
-        Ref<EntityStore> ref = player.getReference();
-
-        if (ref == null || !ref.isValid()) {
-            context.sendMessage(Message.raw(Messages.get("en-US", Messages.ERROR_NOT_IN_WORLD)).color("#FF5555"));
-            return CompletableFuture.completedFuture(null);
-        }
-
-        Store<EntityStore> store = ref.getStore();
-        if (store == null) {
-            context.sendMessage(Message.raw(Messages.get("en-US", Messages.ERROR_NOT_IN_WORLD)).color("#FF5555"));
-            return CompletableFuture.completedFuture(null);
-        }
-        EntityStore entityStore = (EntityStore) store.getExternalData();
-        if (entityStore == null) {
-            context.sendMessage(Message.raw(Messages.get("en-US", Messages.ERROR_NOT_IN_WORLD)).color("#FF5555"));
-            return CompletableFuture.completedFuture(null);
-        }
-        World world = entityStore.getWorld();
-        if (world == null) {
-            context.sendMessage(Message.raw(Messages.get("en-US", Messages.ERROR_NOT_IN_WORLD)).color("#FF5555"));
-            return CompletableFuture.completedFuture(null);
-        }
-
-        // Run in world thread
-        return CompletableFuture.runAsync(() -> {
-            PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
-            if (playerRef == null) return;
-
-            UUID playerUuid = playerRef.getUuid();
-            String username = playerRef.getUsername();
-
-            String nickname = null;
-            String fullInput = context.getInputString();
-            if (fullInput != null && !fullInput.isEmpty()) {
-                String[] parts = fullInput.split("\\s+", 2);
-                if (parts.length > 1) {
-                    nickname = parts[1].trim();
-                }
+        String arg = "";
+        String fullInput = context.getInputString();
+        if (fullInput != null) {
+            String[] parts = fullInput.trim().split("\\s+", 2);
+            if (parts.length > 1) {
+                arg = parts[1].trim();
             }
+        }
 
-            if (nickname == null || nickname.isEmpty()) {
-                // Open UI editor
-                openNicknameEditor(player, ref, store, playerRef);
+        if (arg.isEmpty()) {
+            openNicknameEditor(ref, store, playerRef);
+            return;
+        }
+
+        if (arg.equalsIgnoreCase("settings")) {
+            if (!PermissionsModule.get().hasPermission(playerUuid, PERM_ADMIN, false)) {
+                playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_SETTINGS_PERM)).color("#FF5555"));
                 return;
             }
+            openNicknameSettings(ref, store, playerRef);
+            return;
+        }
 
-            String arg = nickname.trim();
+        if (arg.equalsIgnoreCase("reset") || arg.equalsIgnoreCase("clear") ||
+            arg.equalsIgnoreCase("off") || arg.equalsIgnoreCase("remove")) {
+            resetNickname(ref, store, playerRef, playerUuid, username);
+            return;
+        }
 
-            if (arg.equalsIgnoreCase("settings")) {
-                if (!PermissionsModule.get().hasPermission(playerUuid, PERM_ADMIN, false)) {
-                    playerRef.sendMessage(Message.raw(Messages.get(playerRef, Messages.ERROR_NO_SETTINGS_PERM)).color("#FF5555"));
-                    return;
-                }
-                openNicknameSettings(player, ref, store, playerRef);
-                return;
-            }
+        if (arg.split("\\s+", 2)[0].equalsIgnoreCase("msgcolor")) {
+            handleMsgColor(playerRef, playerUuid, arg);
+            return;
+        }
 
-            if (arg.equalsIgnoreCase("reset") || arg.equalsIgnoreCase("clear") ||
-                arg.equalsIgnoreCase("off") || arg.equalsIgnoreCase("remove")) {
-                if (!ref.isValid()) return;
-                resetNickname(ref, store, playerRef, playerUuid, username);
-                return;
-            }
-
-            if (arg.toLowerCase().startsWith("msgcolor")) {
-                handleMsgColor(playerRef, playerUuid, arg);
-                return;
-            }
-
-            setNickname(ref, store, playerRef, playerUuid, username, arg);
-        }, world);
+        setNickname(ref, store, playerRef, playerUuid, username, arg);
     }
 
-    private void openNicknameEditor(@Nonnull Player player, @Nonnull Ref<EntityStore> ref,
-                                     @Nonnull Store<EntityStore> store, @Nonnull PlayerRef playerRef) {
-        NicknameEditorPage editorPage = new NicknameEditorPage(storage, config, playerRef);
-        player.getPageManager().openCustomPage(ref, store, editorPage);
+    private void openNicknameEditor(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nonnull PlayerRef playerRef) {
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player == null) return;
+        player.getPageManager().openCustomPage(ref, store, new NicknameEditorPage(storage, config, playerRef));
     }
 
-    private void openNicknameSettings(@Nonnull Player player, @Nonnull Ref<EntityStore> ref,
-                                       @Nonnull Store<EntityStore> store, @Nonnull PlayerRef playerRef) {
-        NicknameSettingsPage settingsPage = new NicknameSettingsPage(storage, config, playerRef);
-        player.getPageManager().openCustomPage(ref, store, settingsPage);
+    private void openNicknameSettings(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nonnull PlayerRef playerRef) {
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player == null) return;
+        player.getPageManager().openCustomPage(ref, store, new NicknameSettingsPage(storage, config, playerRef));
     }
 
     private void resetNickname(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store, @Nonnull PlayerRef playerRef, @Nonnull UUID uuid, @Nonnull String username) {
