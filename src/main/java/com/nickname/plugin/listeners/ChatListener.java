@@ -7,6 +7,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.nickname.plugin.chat.ChatFormatParser;
 import com.nickname.plugin.commands.NickCommand;
+import com.nickname.plugin.compat.EliteEssentialsCompat;
 import com.nickname.plugin.compat.EssentialsPlusCompat;
 import com.nickname.plugin.config.PluginConfig;
 import com.nickname.plugin.hooks.LuckPermsHook;
@@ -34,6 +35,8 @@ public class ChatListener {
     private final Set<String> reportedFormatters = ConcurrentHashMap.newKeySet();
     @Nullable
     private volatile EssentialsPlusCompat essentialsPlus;
+    @Nullable
+    private volatile EliteEssentialsCompat eliteEssentials;
     /** Chat text before EssentialsPlus color tags were added, to undo it if EP didn't take the message. */
     private final Map<PlayerChatEvent, String> uncoloredContent = Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -48,13 +51,20 @@ public class ChatListener {
         this.essentialsPlus = essentialsPlus;
     }
 
+    /** With EliteEssentials also formatting chat, EssentialsPlus is not the only owner: no EP markup then. */
+    public void setEliteEssentials(@Nonnull EliteEssentialsCompat eliteEssentials) {
+        this.eliteEssentials = eliteEssentials;
+    }
+
     /**
-     * FIRST priority, only with EssentialsPlus formatting chat: EP renders color tags in the chat
+     * FIRST priority, only when EssentialsPlus is the plugin formatting chat (not EliteEssentials too): EP renders color tags in the chat
      * text, so the player's message color is added around it (EP parses players' text as markup anyway).
      */
     public void onPlayerChatEarly(@Nonnull PlayerChatEvent event) {
         EssentialsPlusCompat essentialsPlus = this.essentialsPlus;
-        if (event.isCancelled() || essentialsPlus == null || !essentialsPlus.isChatEnabled()) return;
+        EliteEssentialsCompat eliteEssentials = this.eliteEssentials;
+        if (event.isCancelled() || essentialsPlus == null || !essentialsPlus.isChatEnabled()
+                || (eliteEssentials != null && eliteEssentials.isChatEnabled())) return;
         String color = messageColor(event.getSender().getUuid());
         if (color != null) {
             uncoloredContent.put(event, event.getContent());

@@ -117,6 +117,7 @@ public class NicknameChanger extends JavaPlugin {
         EliteEssentialsCompat eliteEssentials = EliteEssentialsCompat.create(storage);
         if (eliteEssentials != null) {
             service.addMirror(eliteEssentials);
+            chatListener.setEliteEssentials(eliteEssentials);
         }
         MiniChatFormatterCompat miniChatFormatter = MiniChatFormatterCompat.create(placeholders);
         if (miniChatFormatter != null) {
@@ -146,11 +147,19 @@ public class NicknameChanger extends JavaPlugin {
             + ", EliteEssentials=" + PluginDetector.isLoaded(PluginDetector.ELITE_ESSENTIALS)
             + ", mini-chat-formatter=" + PluginDetector.isLoaded(PluginDetector.MINI_CHAT_FORMATTER)
             + ", HyperPerms=" + PluginDetector.isLoaded(PluginDetector.HYPERPERMS);
+        boolean epChat = essentialsPlus != null && essentialsPlus.isChatEnabled();
+        boolean eeChat = eliteEssentials != null && eliteEssentials.isChatEnabled();
+        if (epChat && eeChat) {
+            getLogger().at(Level.WARNING).log("Both EssentialsPlus and EliteEssentials format chat, so messages can be sent twice; "
+                + "disable chat formatting in one of them. NickNameChanger keeps both nicknames in sync but adds no message colors.");
+        }
         String route;
-        if (essentialsPlus != null && essentialsPlus.isChatEnabled()) {
+        if (epChat && eeChat) {
+            route = "EssentialsPlus and EliteEssentials both format chat (see warning)";
+        } else if (epChat) {
             route = "EssentialsPlus formats chat; nicknames are synced into its {player} (EP accepts only A-Z, 0-9, _)";
-        } else if (eliteEssentials != null) {
-            route = "EliteEssentials formats chat (if its chatFormat is enabled); nicknames are synced into its {player}";
+        } else if (eeChat) {
+            route = "EliteEssentials formats chat; nicknames are synced into its {player}";
         } else if (miniChatFormatter != null) {
             route = "mini-chat-formatter formats chat; <username> shows the nickname";
         } else if (PluginDetector.isLoaded(PluginDetector.MINI_CHAT_FORMATTER)) {

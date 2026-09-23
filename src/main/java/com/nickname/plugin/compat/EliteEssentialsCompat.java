@@ -6,6 +6,7 @@ import com.nickname.plugin.util.MessageUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -21,16 +22,25 @@ public final class EliteEssentialsCompat extends NicknameMirror {
     private final Method getNickname;
     private final Method setNick;
     private final Method clearNick;
+    private final Object configManager;
+    private final Method getConfig;
+    private final Field chatFormat;
+    private final Field chatFormatEnabled;
 
     private EliteEssentialsCompat(NicknameStorage storage) throws ReflectiveOperationException {
         super(storage, "eliteessentials");
         Class<?> plugin = Class.forName("com.eliteessentials.EliteEssentials");
         Class<?> service = Class.forName("com.eliteessentials.services.NickService");
-        this.nickService = plugin.getMethod("getNickService").invoke(plugin.getMethod("getInstance").invoke(null));
+        Object instance = plugin.getMethod("getInstance").invoke(null);
+        this.nickService = plugin.getMethod("getNickService").invoke(instance);
+        this.configManager = plugin.getMethod("getConfigManager").invoke(instance);
+        this.getConfig = Class.forName("com.eliteessentials.config.ConfigManager").getMethod("getConfig");
+        this.chatFormat = Class.forName("com.eliteessentials.config.PluginConfig").getField("chatFormat");
+        this.chatFormatEnabled = Class.forName("com.eliteessentials.config.PluginConfig$ChatFormatConfig").getField("enabled");
         this.getNickname = service.getMethod("getNickname", UUID.class);
         this.setNick = service.getMethod("setNick", UUID.class, String.class);
         this.clearNick = service.getMethod("clearNick", UUID.class);
-        if (nickService == null) throw new IllegalStateException("EliteEssentials NickService not available");
+        if (nickService == null || configManager == null) throw new IllegalStateException("EliteEssentials NickService not available");
     }
 
     /** Returns the adapter, or {@code null} if EliteEssentials is not installed or its API differs. Call from start(). */
@@ -50,6 +60,15 @@ public final class EliteEssentialsCompat extends NicknameMirror {
     @Override
     public String name() {
         return "EliteEssentials";
+    }
+
+    /** True if EliteEssentials currently formats chat (its chatFormat.enabled setting). */
+    public boolean isChatEnabled() {
+        try {
+            return chatFormatEnabled.getBoolean(chatFormat.get(getConfig.invoke(configManager)));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return false;
+        }
     }
 
     @Nonnull
